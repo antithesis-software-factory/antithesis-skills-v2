@@ -23,7 +23,11 @@
    }
 
    Triage the run with `/antithesis triage` from the Antithesis plugin. The code under test is @<owner>/<repo>. Report issues to that github repository.
+
+   If the skill is not found, the plugin is still loading. Wait 10 seconds and try again.
    ```
+
+   Devin installs plugins in the background when a session starts, so a skill call in the first few seconds can fail with "not found". The retry line covers that. It has to be in this prompt because the skill itself isn't loaded yet when the call fails.
 
    `@<owner>/<repo>` must be an `@` mention: it is what gives the session the repository.
 

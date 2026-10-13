@@ -16,3 +16,9 @@ Pick the module from the first argument, then read only that module's `MODULE.md
 | `properties` | [properties/MODULE.md](properties/MODULE.md) | Importing existing properties (`import`) or defining a new one (`define`). |
 
 If there is no argument, infer the module from the request. If it is still ambiguous, ask.
+
+## Platform notes
+
+If you are running on one of these platforms, read its notes before starting:
+
+- Devin: [platforms/devin.md](platforms/devin.md)
