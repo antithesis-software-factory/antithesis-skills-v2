@@ -71,10 +71,8 @@ Each property may expose multiple example rows (typically 3-4), mixing failing
 and passing examples. When triaging, start with the **first failing example**
 (usually index 0) by default. Cross-referencing a passing example can help
 narrow down root cause by showing what's different in a healthy execution. If you want more
-examples you may obtain more log files for failures that match the property. You will need to
-retrieve the log file to get the details of the failure in order to perform the search,
-first using `snouty runs events` and then using the `antithesis-query-logs` skill
-if more examples are needed.
+examples, find more moments for the property with `snouty runs search` (see the triage
+module's "Investigate failed properties") and download their logs.
 
 ### Filtering properties
 
