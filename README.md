@@ -4,8 +4,9 @@ Antithesis skills, packaged as one plugin for each agent platform.
 
 - `plugins/antithesis/skills/antithesis/` is the entry point. Its `SKILL.md` routes `/antithesis <module>` to one module per subcommand.
 - `plugins/antithesis/skills/snouty/` sets up and uses snouty, the Antithesis CLI.
-- `plugins/antithesis/.devin-plugin/plugin.json` is the Devin manifest. Other platforms get their own manifest next to it, pointing at the same `skills/`.
+- `plugins/antithesis/.devin-plugin/plugin.json` is the Devin manifest. Other platforms that read a manifest get their own next to it, pointing at the same `skills/`. Replit reads no manifest and imports `skills/` directly.
 
 ## Install
 
-Devin: Customize → Plugins → Add plugin → From repository. Enter this repo and the subdirectory `plugins/antithesis`. [docs/devin.md](plugins/antithesis/docs/devin.md) covers the rest of customer setup.
+- Devin: [docs/devin.md](docs/devin.md)
+- Replit: [docs/replit.md](docs/replit.md)

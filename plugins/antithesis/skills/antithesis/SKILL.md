@@ -22,3 +22,4 @@ If there is no argument, infer the module from the request. If it is still ambig
 If you are running on one of these platforms, read its notes before starting:
 
 - Devin: [platforms/devin.md](platforms/devin.md)
+- Replit: [platforms/replit.md](platforms/replit.md)

@@ -9,7 +9,7 @@
   * ANTITHESIS_TENANT
   * ANTITHESIS_REPOSITORY (GAR repository url)
   * ANTITHESIS_GAR_KEY
-* Install the plugin (Customize → Plugins).
+* Install the plugin: Customize → Plugins → Add plugin → From repository. Enter `antithesis-software-factory/antithesis-skills-v2` and the subdirectory `plugins/antithesis`.
   * Choose to either install it on the enterprise, organization, or personal scope
 * Create an automation with a webhook trigger (Automations → New automation → Webhook), with this prompt. Save the webhook URL and secret; the secret is shown only once.
 
