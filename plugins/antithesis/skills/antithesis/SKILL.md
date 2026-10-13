@@ -1,6 +1,7 @@
 ---
 name: antithesis
 description: Entry point to Antithesis. Use for anything involving Antithesis runs, properties, or workloads - figuring out why a run failed, debugging a property failure in the multiverse debugger, building or improving a workload, or importing and defining properties.
+argument-hint: "[triage|debug|workload|properties] [target]"
 ---
 
 # Antithesis
