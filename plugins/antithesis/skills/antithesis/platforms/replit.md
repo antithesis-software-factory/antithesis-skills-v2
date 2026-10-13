@@ -1,5 +1,5 @@
 # Replit
 
-- Antithesis credentials come from the App's Secrets. If `ANTITHESIS_TENANT` or `ANTITHESIS_API_KEY` is missing, tell the user to add it there, then stop. Never ask the user to paste the API key into chat.
+- Antithesis credentials come from the App's Secrets. If `ANTITHESIS_TENANT` or `ANTITHESIS_API_KEY` is missing, tell the user to add it there, then stop.
 - Replit chats can't read secrets. If you are running in a chat rather than an App, tell the user to run the request from an App that has the secrets, then stop.
-- If a module tells you to use a subagent and you can't start one, do that work yourself, one item at a time.
+- Replit preinstalls a `snouty` at `/repl/tools/bin/snouty` that ignores `ANTITHESIS_TENANT` and `ANTITHESIS_API_KEY` and talks to Replit's own Antithesis proxy instead. Don't use it. Install the official snouty with the `snouty` skill's install command even though `snouty` is already on the PATH, then run `export PATH="$HOME/.local/bin:$PATH"` and check that `command -v snouty` prints `$HOME/.local/bin/snouty`.
