@@ -1,5 +1,5 @@
 {
-  "name": "antithesis-dev",
-  "version": "0.0.5",
+  "name": "antithesis",
+  "version": "0.0.6",
   "description": "Antithesis skills for Devin: write Antithesis workloads and triage Antithesis runs"
 }
