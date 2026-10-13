@@ -45,7 +45,7 @@ Also check the `Software was instrumented` and `Symbols were uploaded` propertie
 
 ## Investigate failed properties
 
-When several properties fail, triage each one in its own subagent if your environment supports subagents.
+Triage each failing property in its own subagent.
 
 Read `references/logs.md` before downloading any logs. Then, for each failing property:
 
