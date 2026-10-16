@@ -11,7 +11,7 @@ Pick the module from the first argument, then read only that module's `MODULE.md
 | Argument | Module | Use when |
 |---|---|---|
 | `triage` | [triage/MODULE.md](triage/MODULE.md) | A run has started or finished and you need to know what failed. |
-| `debug` | [debug/MODULE.md](debug/MODULE.md) | A specific property failure needs investigating in the multiverse debugger. |
+| `debug` | [debug/MODULE.md](debug/MODULE.md) | A specific property failure needs investigating (multiverse debugging). |
 | `workload` | [workload/MODULE.md](workload/MODULE.md) | Building or iterating on a workload. |
 | `properties` | [properties/MODULE.md](properties/MODULE.md) | Importing existing properties (`import`) or defining a new one (`define`). |
 

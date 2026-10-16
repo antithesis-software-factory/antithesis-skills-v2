@@ -23,12 +23,14 @@ snouty requires `ANTITHESIS_TENANT` and `ANTITHESIS_API_KEY` to be set. If eithe
 
 ## Commands
 
-Pass `--json` when parsing output.
+Always pass `--json` to `snouty`, for full output.
 
-- `snouty runs list`: recent runs.
-- `snouty runs show <run_id>`: status and links for one run.
-- `snouty runs wait <run_id>`: block until the run finishes.
-- `snouty runs properties <run_id>`: each property and whether it passed. Failing properties include example moments.
-- `snouty runs logs <run_id> <hash> <vtime>`: logs for one timeline up to a moment. Always pass `vtime`; without it the log streams to the end of the timeline.
-- `snouty runs events <run_id> -m <needle>`: events in the run that contain a string.
-- `snouty runs search <run_id> <query>`: an event-set DSL query over the run's events. See `snouty runs search --help`.
+See `snouty --help` for full details.
+
+- `snouty --json runs list`: recent runs.
+- `snouty --json runs show <run_id>`: status and links for one run.
+- `snouty --json runs wait <run_id>`: block until the run finishes. `--until ready` returns once the run is ready for `runs exec`.
+- `snouty --json runs properties <run_id>`: each property and whether it passed. Failing properties include example moments.
+- `snouty --json runs logs <run_id> <hash> <vtime>`: logs for one timeline up to a moment. Always pass `vtime`; without it the log streams to the end of the timeline.
+- `snouty --json runs events <run_id> -m <needle>`: events in the run that contain a string.
+- `snouty --json runs search <run_id> <query>`: an event-set DSL query over the run's events. See `snouty runs search --help`.

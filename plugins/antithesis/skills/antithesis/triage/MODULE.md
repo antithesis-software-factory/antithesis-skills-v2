@@ -8,7 +8,7 @@ The `references/` directory has detailed guides. Read each one only when a step 
 
 ## Setup
 
-Set up snouty with the `snouty` skill. Use `SNOUTY_UNSTABLE_FEATURES=runs-search` for every snouty command. You also need `jq`.
+Set up snouty with the `snouty` skill. You also need `jq`.
 
 Check that snouty can reach Antithesis:
 
