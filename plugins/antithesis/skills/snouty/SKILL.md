@@ -34,3 +34,7 @@ See `snouty --help` for full details.
 - `snouty --json runs logs <run_id> <hash> <vtime>`: logs for one timeline up to a moment. Always pass `vtime`; without it the log streams to the end of the timeline.
 - `snouty --json runs events <run_id> -m <needle>`: events in the run that contain a string.
 - `snouty --json runs search <run_id> <query>`: an event-set DSL query over the run's events. See `snouty runs search --help`.
+
+## Conceptual model
+
+Read `./references/model.md` for a conceptual model of how Antithesis works when using snouty.

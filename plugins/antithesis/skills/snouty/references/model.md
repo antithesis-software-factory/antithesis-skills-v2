@@ -11,7 +11,7 @@ Conceptually, a run is a tree, where each point on the tree is a moment, and eac
 
 ## Commands
 
-Always pass `--json`.
+See `snouty --help`. Always pass `--json`.
 
 - `snouty --json runs properties <run_id> --failing`: see failing properties along with their moments.
 - `snouty --json runs logs <run_id> <input_hash> <vtime>`: all events on the given moment's timeline, up to that moment.
