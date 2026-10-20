@@ -21,5 +21,8 @@ The action generator never exits on its own. Antithesis decides how long each ti
 1. **Pick what to test.** List the actions the workload will take, usually the system's public API calls. Decide what the model tracks and which properties to check against it. If a property catalog for this system already exists, start from that.
 2. **Report setup complete.** Make the system emit `setup_complete` once it is ready to serve requests. This belongs in the system's containers, not in the action generator. See `references/harness.md`.
 3. **Write the action generator.** Read `references/action-generator.md`. It has a complete example and the rules to follow.
+<!-- dev-only:start -->
+   Also read `references/action-log.md`, and log every action as it describes.
+<!-- dev-only:end -->
 4. **Wire up the harness.** Add the `workload` container, the test template, and the fault exclusion. See `references/harness.md`.
 5. **Check it locally.** Run `snouty validate` on the directory with `docker-compose.yaml`, and fix anything it reports.
