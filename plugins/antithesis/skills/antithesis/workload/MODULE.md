@@ -33,5 +33,9 @@ The action generator never exits on its own. Antithesis decides how long each ti
    - every sometimes assertion that doesn't depend on faults is reached
    - stopping a system container (`docker stop`) makes the system's process shut down, not get killed after the timeout
 
-   Fix anything that fails.
+   Fix anything that fails. When a property fails, find out why before moving on, by reading the system's code path for that request:
+   - If the system breaks something it promises, or that its real clients depend on, keep the property and record the bug in the harness README.
+   - If the property demands more than the system promises by design, fix the property.
+
+   Don't launch with properties you know are wrong: every false failure hides real ones.
 8. **Close coverage gaps.** Launch a run, then use its coverage to find code the workload never reached, and fix the workload or deployment. Repeat until the remaining gaps are out of scope or rare. See `references/coverage-loop.md`.

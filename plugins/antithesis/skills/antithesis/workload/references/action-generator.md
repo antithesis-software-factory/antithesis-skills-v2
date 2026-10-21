@@ -173,6 +173,8 @@ fn main(tc: TestCase) {
 
 **Let requests contend.** Bugs live where requests to the same data overlap. Don't serialize requests per key or per object to keep the model simple. Record when each request started and finished, and check responses against every outcome consistent with what overlapped them, as the example does. If the system assigns its own order to operations (a log position, a sequence number, a commit timestamp), use it: record each acknowledged operation at its position, and check what reads and subscriptions return against that history.
 
+**Derive every property from what this system promises.** That means its documentation, its API contract, and what its real clients rely on. A system that implements another system's API often weakens some of its guarantees on purpose, for example how fresh a reported version is, or what an edge-case input does. Check each property against the system's own code path before relying on it. Where the system deliberately promises less than the API it imitates, check what it does promise.
+
 **Treat unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, possibly much later. Keep it as possible, never as failed.
 
 **Keep every rule fast.** Because of rounds, a rule that blocks stalls all workers.
