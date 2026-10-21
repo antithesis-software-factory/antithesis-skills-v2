@@ -70,5 +70,5 @@ snouty launch --launcher advanced_test --config . --duration <minutes> \
   ...
 ```
 
-- `custom.network_fault_exclusion_patterns` is matched against container names. Every packet to or from a matching container is exempt from network faults. Set it to the single name `workload`. Patterns with alternation or groups, like `^(a|b)$`, have stalled runs right as faults start. Helper containers that only report setup don't need excluding.
+- `custom.network_fault_exclusion_patterns` is matched against container names. Every packet to or from a matching container is exempt from network faults. Set it to `workload`. Never use parentheses in it: any pattern with a group, like `^(a|b)$`, currently stalls the run right after setup. To exclude several containers, use `^a$|^b$`. Helper containers that only report setup don't need excluding.
 - `custom.container_fault_include_patterns` is a comma-separated list of patterns. Kills, pauses, and CPU pressure only hit containers matching one of them. Leave `workload` out of it.
