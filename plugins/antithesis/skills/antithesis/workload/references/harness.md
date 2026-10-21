@@ -14,7 +14,7 @@ Build the action generator into its own image and add it to `docker-compose.yaml
       dockerfile: workload/Dockerfile
     image: workload:latest
     environment:
-      KV_URL: http://kv:8000
+      KV_URLS: http://kv1:8000,http://kv2:8000
 ```
 
 ```dockerfile
@@ -47,7 +47,7 @@ exec /usr/local/bin/action-generator
 
 Make both executable. Don't add `parallel_driver_`, `serial_driver_` or `finally_` commands: concurrency belongs in the action generator.
 
-**The `eventually_` command.** Antithesis may run it at any point after the action generator has started. It first kills the action generator and stops all faults, and the timeline ends after it. Use it for liveness: every node of the system serves requests again, replicas converge, background work catches up. Build it as a second binary in the same crate, declared with a `[[bin]]` entry (`name = "eventually-recovers"`, `path = "src/eventually_recovers.rs"`), with the shared client code in `src/lib.rs`. Avoid a `src/bin/` directory: many repositories ignore `bin/` in `.gitignore`. Faults have only just stopped, so retry with a deadline (a minute or two) rather than failing on the first error, and report the outcome with an `assert_always!`.
+**The `eventually_` command.** Antithesis may run it at any point after the action generator has started. It first kills the action generator and stops all faults, and the timeline ends after it (`snouty docs show /docs/product/writing_tests/test_templates/test_composer_reference/`). Use it for liveness: every node of the system serves requests again, replicas converge, background work catches up. Build it as a second binary in the same crate, declared with a `[[bin]]` entry (`name = "eventually-recovers"`, `path = "src/eventually_recovers.rs"`), with the shared client code in `src/lib.rs`. Name the package `action-generator` so the main binary matches the Dockerfile. Faults have only just stopped, so retry with a deadline (a minute or two) rather than failing on the first error, and report the outcome with an `assert_always!`.
 
 ## Setup complete
 
@@ -57,8 +57,8 @@ Antithesis starts the action generator only after something reports `setup_compl
 {"antithesis_setup": {"status": "complete"}}
 ```
 
-**A container that dies before setup completes fails the whole run.** Make startup robust:
-- If several nodes initialize shared state on first boot (a schema, a bootstrap record, a cluster ID), start one node first and the rest once it's healthy (`depends_on` with `condition: service_healthy`). Concurrent first boots can race, and the loser may exit.
+**A container that dies before setup completes can fail the whole run.** Make startup robust:
+- If several nodes initialize shared state on first boot (a schema, a bootstrap record, a cluster ID), start one node first and the rest once it's healthy (`depends_on` with `condition: service_healthy`). Concurrent first boots can race.
 - Report `setup_complete` only once every node is serving, from a check that retries rather than from a fixed sleep.
 - If a startup race kills a node, that's a real bug: note it in the harness README, but still order startup so runs can proceed.
 
@@ -75,5 +75,5 @@ snouty launch --launcher advanced_test --config . --duration <minutes> \
   ...
 ```
 
-- `custom.network_fault_exclusion_patterns` is matched against container names. Every packet to or from a matching container is exempt from network faults. Set it to `workload`. Never use parentheses in it: any pattern with a group, like `^(a|b)$`, currently stalls the run right after setup. To exclude several containers, use `^a$|^b$`. Helper containers that only report setup don't need excluding.
+- `custom.network_fault_exclusion_patterns` is matched against container names. Every packet to or from a matching container is exempt from network faults. Set it to `workload`. Avoid parentheses in it: as of October 2026, patterns with a group, like `^(a|b)$`, have stalled runs right after setup. To exclude several containers, use `^a$|^b$`. Helper containers that only report setup don't need excluding.
 - `custom.container_fault_include_patterns` is a comma-separated list of patterns. Kills, pauses, and CPU pressure only hit containers matching one of them. Leave `workload` out of it.

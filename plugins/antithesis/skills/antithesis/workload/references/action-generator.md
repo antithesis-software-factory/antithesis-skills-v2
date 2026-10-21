@@ -31,6 +31,10 @@ use std::time::{Duration, Instant};
 
 const KEYS: usize = 8;
 const TIMEOUT: Duration = Duration::from_millis(1000);
+/// How long a write whose outcome we never learned stays possible. Real systems apply
+/// such writes soon or never, and keeping them forever would make the check accept almost
+/// anything. A write applied later than this would show up as a false failure.
+const AMBIGUITY_WINDOW: Duration = Duration::from_secs(60);
 
 /// One write the workload sent. `end` is when the system acknowledged it, or `None`
 /// if we never learned the outcome: such a write may take effect at any later time.
@@ -65,8 +69,7 @@ fn acceptable(got: Option<u32>, start: Instant, end: Instant, writes: &[Write]) 
 
 /// Drops writes that no read can return any more: those certainly overwritten by a write
 /// that finished well over a request timeout ago, so no read still in flight began before
-/// it. Keeps the check cheap in long runs. Unacknowledged writes are kept, since they may
-/// still take effect.
+/// it, and unacknowledged writes older than `AMBIGUITY_WINDOW`. Keeps the check cheap in long runs.
 fn prune(writes: &mut Vec<Write>) {
     let now = Instant::now();
     // Starts of writes that finished long enough ago (twice the timeout, for margin).
@@ -76,7 +79,7 @@ fn prune(writes: &mut Vec<Write>) {
         .map(|w| w.start)
         .collect();
     writes.retain(|w| match w.end {
-        None => true,
+        None => now.duration_since(w.start) < AMBIGUITY_WINDOW,
         Some(e) => !settled.iter().any(|o_start| *o_start > e),
     });
 }
@@ -88,7 +91,8 @@ impl Workload {
 
     fn get(&self, node: usize, key: usize) -> Result<Option<u32>, ureq::Error> {
         match self.http.get(&format!("{}/k/{key}", self.nodes[node])).call() {
-            Ok(resp) => Ok(Some(resp.into_string()?.trim().parse().expect("non-numeric value"))),
+            // An unparseable body becomes a value no write produced, so the check reports it.
+            Ok(resp) => Ok(Some(resp.into_string()?.trim().parse().unwrap_or(u32::MAX))),
             Err(ureq::Error::Status(404, _)) => Ok(None),
             Err(e) => Err(e),
         }
@@ -105,15 +109,16 @@ impl Workload {
         let value = self.next_value.fetch_add(1, Ordering::Relaxed);
         self.writes[key].lock().unwrap().push(Write { value, start: Instant::now(), end: None });
         // A failed write may still be applied later, so it keeps `end: None`.
-        if self.put(node, key, value).is_ok() {
-            let end = Instant::now();
-            let mut w = self.writes[key].lock().unwrap();
+        let ok = self.put(node, key, value).is_ok();
+        let end = Instant::now();
+        let mut w = self.writes[key].lock().unwrap();
+        if ok {
             // Find the record by its value: pruning may have moved it.
             if let Some(rec) = w.iter_mut().find(|r| r.value == value) {
                 rec.end = Some(end);
             }
-            prune(&mut w);
         }
+        prune(&mut w);
     }
 
     #[rule(group = "ops", weight = 3.0)]
@@ -169,16 +174,16 @@ fn main(tc: TestCase) {
 
 **Generate only.** Keep `phases = [hegel::Phase::Generate]` on `#[hegel::main]`. Shrinking re-runs the rules thousands of times against the live system.
 
-**Cover the surface you mapped.** Every in-scope operation and option from the surface table (`references/surface.md`) gets an action, or a draw inside an action. Requests that differ only in an option (an ack mode, an isolation level, a batch form, a filter) usually take separate code paths in the system: draw the option, don't hard-code the common case.
+**Cover the surface you mapped.** Every operation and option you put in scope in the surface table (`references/surface.md`) gets an action, or a draw inside an action. Requests that differ only in an option (an ack mode, an isolation level, a batch form, a filter) usually take separate code paths in the system: draw the option, don't hard-code the common case.
 
 **Let requests contend.** Bugs live where requests to the same data overlap. Don't serialize requests per key or per object to keep the model simple. Record when each request started and finished, and check responses against every outcome consistent with what overlapped them, as the example does. If the system assigns its own order to operations (a log position, a sequence number, a commit timestamp), use it: record each acknowledged operation at its position, and check what reads and subscriptions return against that history.
 
-**Derive every property from what this system promises.** That means its documentation, its API contract, and what its real clients rely on. A system that implements another system's API often weakens some of its guarantees on purpose, for example how fresh a reported version is, or what an edge-case input does. Check each property against the system's own code path before relying on it. Where the system deliberately promises less than the API it imitates, check what it does promise.
+**Derive every property from what this system promises.** That means its documentation, its API contract, and what its real clients rely on. Implementations often promise less than the protocol or the system they resemble, on purpose: for example, how fresh a reported position is, or what an edge-case input does. Check each property against the system's own code path before relying on it. Where the system deliberately promises less than the API it imitates, check what it does promise.
 
 **Treat unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, possibly much later. Keep it as possible, never as failed.
 
 **Keep every rule fast.** Because of rounds, a rule that blocks stalls all workers.
-- Use client timeouts that are short relative to the operation's normal latency, often around a second, so a request to an unreachable node fails fast. Operations that are slow by design (long polls, streams, schema changes, large batches) get their own longer timeout, or run as described below.
+- Use client timeouts long enough for a normal request to finish under load, but no longer, so a request to an unreachable node fails fast. That's often one or two seconds, more for systems that sync to disk or reach consensus on every write. Operations that are slow by design (long polls, streams, schema changes, large batches) get their own longer timeout, or run as described below.
 - Send each request to a randomly drawn node, so one node being down doesn't stop the workload.
 - Don't sleep or poll inside a rule. A check that has to wait for something (expiry, convergence, delivery) should record what it expects and check it in a later rule, once the wait has passed.
 - Long-lived interactions (subscriptions, streams, sessions, open transactions) live in the workload's state, not inside one rule. One rule opens them, other rules use, check or close them, and a background thread can drain a stream into a buffer that rules then check.

@@ -31,6 +31,7 @@ The action generator never exits on its own. Antithesis decides how long each ti
 7. **Check it locally.** Run the instrumentation checks from `references/instrumentation.md`, then `snouty validate` on the directory with `docker-compose.yaml`. Then run the action generator against `docker compose up` for a few minutes and check:
    - every action reaches its intended outcome at least sometimes (success, or the expected rejection for actions meant to fail), and none routinely takes much longer than the operation should
    - every sometimes assertion that doesn't depend on faults is reached
+   - the `eventually_` command passes when run by hand against the healthy system
    - stopping a system container (`docker stop`) makes the system's process shut down, not get killed after the timeout
 
    Fix anything that fails. When a property fails, find out why before moving on, by reading the system's code path for that request:
@@ -40,4 +41,4 @@ The action generator never exits on its own. Antithesis decides how long each ti
    Don't launch with properties you know are wrong: every false failure hides real ones.
 
    Finally, run `git status --ignored` and make sure every file the images build from is committed. The repository's ignore rules can silently drop harness files.
-8. **Review coverage once.** Launch a run, then use its coverage to find code the workload never reached, and fix the workload or deployment. See `references/coverage-loop.md`.
+8. **Review coverage once, then launch the final run.** Launch a run, use its coverage to find code the workload never reached, fix the workload or deployment, and check locally again. Then launch the run you report. See `references/coverage-loop.md`.

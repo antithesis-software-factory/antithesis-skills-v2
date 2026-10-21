@@ -18,13 +18,13 @@ Prioritize by where the logic is. Operations real clients depend on, and code wi
 
 For every item on the list, either:
 - name the action or setup that exercises it, or
-- mark it out of scope and say why: for example, it needs a different deployment (another storage backend, TLS), or it's a stub that only returns "not supported".
+- mark it out of scope and say why: for example, it needs a different deployment mode or an optional component this harness doesn't run, or it's a stub that only returns "not supported".
 
-Write the table into the harness README. Anything a real client would use is in scope unless there's a concrete reason it can't run in this deployment.
+Write the table into the harness README. Put in scope what real clients depend on and where the logic is, as prioritized above. For a large API, say which parts you left for later, and why.
 
 ## 3. Design the deployment to reach it
 
 - **Multiple nodes or replicas** if the system supports them, so replication, coordination and failover code runs.
 - **Turn on background features** that are off by default, or drive them from the workload the way a real client would. Prefer both when both exist: they race each other.
-- **Vary configuration between nodes** where the system allows it (intervals, batch sizes, pool sizes, cache sizes), so each node takes different code paths.
+- **Vary configuration between nodes** where the system documents that a setting may differ per node (intervals, batch sizes, pool sizes, cache sizes), so each node takes different code paths. Never vary settings that must match across a cluster, such as consensus timeouts or protocol versions.
 - **Let failures be real.** The system's process must receive the signals Antithesis sends. Run it as the container's main process (`exec` it from any entrypoint script) or under an init that forwards signals. Don't restart it in a shell loop. Let the process exit, and give the system's containers `restart: on-failure` in `docker-compose.yaml`, so crashes are visible as container events and shutdown code runs.
