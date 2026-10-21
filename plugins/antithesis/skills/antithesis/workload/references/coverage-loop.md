@@ -26,11 +26,13 @@ For every gap of any size, decide which of these it is:
 - **A feature the deployment never turns on:** a background job that's off by default, a configuration the nodes don't use, a topology the harness lacks. Change the deployment.
 - **A condition that's rare:** an error path or race that needs a specific fault or timing. Only act on this if a different action mix or weighting would make the condition common. Don't chase individual error paths.
 
-## Loop
+## When to do this
+
+Do one coverage review, from the first run of the finished workload:
 
 1. Launch a run and wait for it to finish.
 2. Read its coverage and classify the gaps as above.
 3. Fix the workload and deployment for every gap that's a missing request or a missing feature, and update the surface table.
-4. Check locally again, then launch the next run.
+4. Check locally again before launching the final run.
 
-Stop when the remaining gaps are all out of scope or rare conditions, or after three runs. In the harness README, keep a short list of the gaps you found and what you changed for each.
+The surface table should already have caught most gaps. A second review rarely finds much more, so don't repeat this unless the first review led to large changes. In the harness README, keep a short list of the gaps you found and what you changed for each.

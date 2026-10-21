@@ -187,6 +187,8 @@ fn main(tc: TestCase) {
 
 **Weight actions toward what's hard to reach.** Plain reads and writes run constantly anyway. Give options, background-feature triggers, and multi-step interactions enough weight that they happen many times in every timeline.
 
+**Don't let one known bug drown out the rest.** If a bug fires constantly once found, for example an action that crashes the system every few seconds, record it in the harness README and turn down that action's weight so it still happens, but rarely. Otherwise the run spends most of its time on restarts of the same failure.
+
 **Mark interesting states with sometimes assertions.** For each situation that exercises a distinct path (a conditional operation that loses a race, a request that fails over to another node, a retry that succeeds, a background job running during a request, a subscription that resumes after a disconnect), add an `assert_sometimes!`. They show which behaviors the run actually reached.
 
 **Use `#[invariant(always_run)]`, not plain `#[invariant]`.** Hegel runs a plain invariant once on the initial state, and after that only with probability `1 / steps` per round, so with `.steps(i64::MAX)` it never runs again. An `always_run` invariant runs after every round, while no rules are running. Keep it cheap, because it runs often.
