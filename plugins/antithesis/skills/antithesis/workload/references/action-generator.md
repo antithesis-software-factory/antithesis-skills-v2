@@ -2,9 +2,11 @@
 
 The action generator is a hegel concurrent state machine run from `#[hegel::main]`. Each `#[rule]` is one action: it draws its inputs, sends one request to the system, and checks the response against the model. Hegel runs the rules on several worker threads at once, so the system sees concurrent clients.
 
+Hegel runs the workers in rounds. Each worker runs a few rules, and the next round starts only when every worker is done. One slow rule therefore stalls every worker, not just its own.
+
 ## Example
 
-This drives a key-value store with `PUT /k/<key>` and `GET /k/<key>`. Copy its structure and replace the actions, model, and properties with ones for your system.
+This drives a replicated key-value store with `PUT /k/<key>` and `GET /k/<key>` on any of its nodes. Copy its structure and replace the actions, model, and properties with ones for your system.
 
 `Cargo.toml`:
 
@@ -23,32 +25,50 @@ use antithesis_sdk::prelude::*;
 use hegel::TestCase;
 use hegel::generators as gs;
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const KEYS: usize = 8;
 
+/// One write the workload sent. `end` is when the system acknowledged it, or `None`
+/// if we never learned the outcome: such a write may take effect at any later time.
+struct Write {
+    value: u32,
+    start: Instant,
+    end: Option<Instant>,
+}
+
 struct Workload {
-    url: String,
+    nodes: Vec<String>,
     http: ureq::Agent,
-    /// For each key, every value a read could correctly return. `None` means
-    /// the key is absent. A key's lock is held for the whole request, so the
-    /// driver never sends two requests for the same key at once and the model
-    /// stays exact. Requests for different keys still overlap.
-    keys: Vec<Mutex<BTreeSet<Option<u32>>>>,
+    /// Every write sent to each key. Locks are held only to update or check the
+    /// record, never during a request, so requests for the same key overlap.
+    writes: Vec<Mutex<Vec<Write>>>,
+    next_value: AtomicU32,
+}
+
+/// What a read that ran from `start` to `end` may return, given the writes to its key:
+/// a value whose write began before the read ended and wasn't certainly overwritten
+/// before the read began, or nothing if no write had certainly finished by then.
+fn acceptable(got: Option<u32>, start: Instant, end: Instant, writes: &[Write]) -> bool {
+    let overwritten_before_read = |w: &Write| {
+        let Some(w_end) = w.end else { return false };
+        writes.iter().any(|o| o.start > w_end && o.end.is_some_and(|e| e < start))
+    };
+    match got {
+        None => !writes.iter().any(|w| w.end.is_some_and(|e| e < start)),
+        Some(v) => writes.iter().any(|w| w.value == v && w.start < end && !overwritten_before_read(w)),
+    }
 }
 
 impl Workload {
-    fn put(&self, key: usize, value: u32) -> Result<(), ureq::Error> {
-        self.http
-            .put(&format!("{}/k/{key}", self.url))
-            .send_string(&value.to_string())
-            .map(|_| ())
+    fn put(&self, node: usize, key: usize, value: u32) -> Result<(), ureq::Error> {
+        self.http.put(&format!("{}/k/{key}", self.nodes[node])).send_string(&value.to_string()).map(|_| ())
     }
 
-    fn get(&self, key: usize) -> Result<Option<u32>, ureq::Error> {
-        match self.http.get(&format!("{}/k/{key}", self.url)).call() {
+    fn get(&self, node: usize, key: usize) -> Result<Option<u32>, ureq::Error> {
+        match self.http.get(&format!("{}/k/{key}", self.nodes[node])).call() {
             Ok(resp) => Ok(Some(resp.into_string()?.trim().parse().expect("non-numeric value"))),
             Err(ureq::Error::Status(404, _)) => Ok(None),
             Err(e) => Err(e),
@@ -58,66 +78,60 @@ impl Workload {
 
 #[hegel::concurrent_state_machine]
 impl Workload {
-    #[rule(group = "ops")]
+    #[rule(group = "ops", weight = 2.0)]
     fn put_value(&self, tc: TestCase) {
-        // Draw everything before taking a lock.
+        let node = tc.draw(gs::integers::<usize>().max_value(self.nodes.len() - 1));
         let key = tc.draw(gs::integers::<usize>().max_value(KEYS - 1));
-        let value = tc.draw(gs::integers::<u32>().max_value(1000));
-        let mut possible = self.keys[key].lock().unwrap_or_else(|e| e.into_inner());
-        match self.put(key, value) {
-            Ok(()) => *possible = BTreeSet::from([Some(value)]),
-            // A failed write may still have been applied.
-            Err(_) => {
-                possible.insert(Some(value));
-            }
+        // Unique values make every read attributable to exactly one write.
+        let value = self.next_value.fetch_add(1, Ordering::Relaxed);
+        let i = {
+            let mut w = self.writes[key].lock().unwrap();
+            w.push(Write { value, start: Instant::now(), end: None });
+            w.len() - 1
+        };
+        // A failed write may still be applied later, so it keeps `end: None`.
+        if self.put(node, key, value).is_ok() {
+            self.writes[key].lock().unwrap()[i].end = Some(Instant::now());
         }
     }
 
-    #[rule(group = "ops")]
+    #[rule(group = "ops", weight = 3.0)]
     fn get_value(&self, tc: TestCase) {
+        let node = tc.draw(gs::integers::<usize>().max_value(self.nodes.len() - 1));
         let key = tc.draw(gs::integers::<usize>().max_value(KEYS - 1));
-        let mut possible = self.keys[key].lock().unwrap_or_else(|e| e.into_inner());
+        let start = Instant::now();
         // A failed read tells us nothing.
-        let Ok(got) = self.get(key) else { return };
+        let Ok(got) = self.get(node, key) else { return };
+        let end = Instant::now();
+        let writes = self.writes[key].lock().unwrap();
         assert_always!(
-            possible.contains(&got),
-            "read returns a value that was written",
-            &json!({"key": key, "got": got, "possible": *possible})
+            acceptable(got, start, end, &writes),
+            "a read returns the latest acknowledged write or one that overlapped it",
+            &json!({"node": node, "key": key, "got": got})
         );
         assert_sometimes!(got.is_some(), "read finds a written key", &json!({"key": key}));
-        *possible = BTreeSet::from([got]);
-    }
-
-    #[rule(group = "check")]
-    fn recovers_after_faults_stop(&self, tc: TestCase) {
-        // Each round picks a group uniformly, so without this the check would run
-        // in about half of all rounds and faults would rarely be on.
-        if tc.draw(gs::integers::<u32>().max_value(49)) != 0 {
-            return;
-        }
-        if let Some(stop_faults) = std::env::var_os("ANTITHESIS_STOP_FAULTS") {
-            let _ = std::process::Command::new(stop_faults).arg("30").status();
-        }
-        let deadline = Instant::now() + Duration::from_secs(25);
-        let mut healthy = false;
-        while Instant::now() < deadline {
-            if (0..KEYS).all(|key| self.get(key).is_ok()) {
-                healthy = true;
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(500));
-        }
-        assert_always!(healthy, "every key is readable once faults stop", &json!({}));
+        assert_sometimes!(
+            writes.iter().any(|w| w.start < end && w.end.map_or(true, |e| e > start)),
+            "a read overlaps a write to the same key",
+            &json!({"key": key})
+        );
     }
 }
 
 #[hegel::main(phases = [hegel::Phase::Generate])]
 fn main(tc: TestCase) {
     antithesis_init();
+    let nodes = std::env::var("KV_URLS")
+        .unwrap_or_else(|_| "http://kv1:8000,http://kv2:8000".to_string())
+        .split(',')
+        .map(str::to_string)
+        .collect();
     let workload = Workload {
-        url: std::env::var("KV_URL").unwrap_or_else(|_| "http://kv:8000".to_string()),
-        http: ureq::AgentBuilder::new().timeout(Duration::from_secs(10)).build(),
-        keys: (0..KEYS).map(|_| Mutex::new(BTreeSet::from([None]))).collect(),
+        nodes,
+        // Short, so a request to an unreachable node costs a moment, not a stalled round.
+        http: ureq::AgentBuilder::new().timeout(Duration::from_millis(1000)).build(),
+        writes: (0..KEYS).map(|_| Mutex::new(Vec::new())).collect(),
+        next_value: AtomicU32::new(0),
     };
     hegel::stateful::machine(workload)
         .steps(i64::MAX)
@@ -134,8 +148,23 @@ fn main(tc: TestCase) {
 
 **Generate only.** Keep `phases = [hegel::Phase::Generate]` on `#[hegel::main]`. Shrinking re-runs the rules thousands of times against the live system.
 
-**Use `#[invariant(always_run)]`, not plain `#[invariant]`.** Hegel runs a plain invariant once on the initial state, and after that only with probability `1 / steps` per round, so with `.steps(i64::MAX)` it never runs again. An `always_run` invariant runs after every round, while no rules are running. That makes it a good place for checks that need a quiet system, but keep it cheap, because it runs often.
+**Cover the surface you mapped.** Every in-scope operation and option from the surface table (`references/surface.md`) gets an action, or a draw inside an action. Requests that differ only in an option, like a read at a past version or a paginated list, are separate code paths in the system: draw the option, don't hard-code the common case.
 
-For more expensive checks, use a `#[rule]`. In the same group as the actions, it runs alongside other requests, so give it a low `weight` and make the check tolerate concurrent changes. If it needs a quiet system, put it in its own group. Hegel picks among groups uniformly each round, so gate the rule behind a rare draw, as the recovery check in the example does.
+**Let requests contend.** Bugs live where requests to the same data overlap. Don't serialize requests per key or per object to keep the model simple. Record when each request started and finished, and check responses against every outcome consistent with what overlapped them, as the example does. If the system orders operations itself (versions, revisions, sequence numbers, offsets), use that: record each acknowledged operation by its position, and check reads against that history.
+
+**Treat unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, possibly much later. Keep it as possible, never as failed.
+
+**Keep every rule fast.** Because of rounds, a rule that blocks stalls all workers.
+- Use short client timeouts, around a second, so a request to an unreachable node fails fast.
+- Send each request to a randomly drawn node, so one node being down doesn't stop the workload.
+- Don't sleep or poll inside a rule. A check that has to wait for something (expiry, convergence, recovery) should record what it expects and check it in a later rule, once the wait has passed.
+
+**Put liveness checks in an `eventually_` command, not in the action generator.** "Every node serves requests again once faults stop" belongs in a separate `eventually_` command (see `references/harness.md`). Antithesis stops faults and kills the action generator before running it, so it can't use the action generator's model. Checks that need the model stay in rules.
+
+**Weight actions toward what's hard to reach.** Plain reads and writes run constantly anyway. Give options, background-feature triggers, and multi-step interactions enough weight that they happen many times in every timeline.
+
+**Mark interesting states with sometimes assertions.** For each situation that exercises a distinct path (a conditional write that loses a race, a read at an old version, a page boundary, an expired TTL, a cancelled stream, a request that fails over to another node), add an `assert_sometimes!`. They show which behaviors the run actually reached.
+
+**Use `#[invariant(always_run)]`, not plain `#[invariant]`.** Hegel runs a plain invariant once on the initial state, and after that only with probability `1 / steps` per round, so with `.steps(i64::MAX)` it never runs again. An `always_run` invariant runs after every round, while no rules are running. Keep it cheap, because it runs often.
 
 For the rest of hegel's API, like generators, composite types, and rule weights, see the hegel documentation.
