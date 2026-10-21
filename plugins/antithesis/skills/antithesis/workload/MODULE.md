@@ -24,6 +24,9 @@ The action generator never exits on its own. Antithesis decides how long each ti
 3. **Build the SUT with instrumentation.** Read `references/instrumentation.md` and instrument every SUT binary. This is required.
 4. **Report setup complete.** Make the system emit `setup_complete` once it is ready to serve requests. This belongs in the system's containers, not in the action generator. See `references/harness.md`.
 5. **Write the action generator.** Read `references/action-generator.md`. It has a complete example and the rules to follow.
+<!-- dev-only:start -->
+   Also read `references/action-log.md`, and log every action as it describes.
+<!-- dev-only:end -->
 6. **Wire up the harness.** Add the `workload` container, the test template with its `eventually_` command, and the fault exclusion. See `references/harness.md`.
 7. **Check it locally.** Run the instrumentation checks from `references/instrumentation.md`, then `snouty validate` on the directory with `docker-compose.yaml`. Then run the action generator against `docker compose up` for a few minutes and check:
    - every action completes successfully at least sometimes, and none routinely takes longer than about a second
