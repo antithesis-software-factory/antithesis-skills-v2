@@ -38,4 +38,6 @@ The action generator never exits on its own. Antithesis decides how long each ti
    - If the property demands more than the system promises by design, fix the property.
 
    Don't launch with properties you know are wrong: every false failure hides real ones.
+
+   Finally, run `git status --ignored` and make sure every file the images build from is committed. The repository's ignore rules can silently drop harness files.
 8. **Close coverage gaps.** Launch a run, then use its coverage to find code the workload never reached, and fix the workload or deployment. Repeat until the remaining gaps are out of scope or rare. See `references/coverage-loop.md`.
