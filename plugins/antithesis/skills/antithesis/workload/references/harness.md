@@ -57,6 +57,11 @@ Antithesis starts the action generator only after something reports `setup_compl
 {"antithesis_setup": {"status": "complete"}}
 ```
 
+**A container that dies before setup completes fails the whole run.** Make startup robust:
+- If several nodes initialize shared state on first boot (a schema, a bootstrap record, a cluster ID), start one node first and the rest once it's healthy (`depends_on` with `condition: service_healthy`). Concurrent first boots can race, and the loser may exit.
+- Report `setup_complete` only once every node is serving, from a check that retries rather than from a fixed sleep.
+- If a startup race kills a node, that's a real bug: note it in the harness README, but still order startup so runs can proceed.
+
 ## Keep faults away from the workload container
 
 The action generator holds the model in memory and its requests should always arrive, so the workload container must be excluded from faults. Faults between the system's own containers stay on.
