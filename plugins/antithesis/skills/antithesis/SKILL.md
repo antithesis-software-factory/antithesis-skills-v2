@@ -6,14 +6,16 @@ argument-hint: "[triage|debug|workload|properties] [target]"
 
 # Antithesis
 
+Always read `references/antithesis/explainer.md` before starting.
+
 Pick the module from the first argument, then read only that module's `MODULE.md`.
 
-| Argument | Module | Use when |
-|---|---|---|
-| `triage` | [triage/MODULE.md](triage/MODULE.md) | A run has started or finished and you need to know what failed. |
-| `debug` | [debug/MODULE.md](debug/MODULE.md) | A specific property failure needs investigating (multiverse debugging). |
-| `workload` | [workload/MODULE.md](workload/MODULE.md) | Building or iterating on a workload. |
-| `properties` | [properties/MODULE.md](properties/MODULE.md) | Importing existing properties (`import`) or defining a new one (`define`). |
+| Argument     | Module                            | Use when                                                                   |
+| ------------ | --------------------------------- | -------------------------------------------------------------------------- |
+| `triage`     | `references/triage/MODULE.md`     | A run has started or finished and you need to know what failed.            |
+| `debug`      | `references/debug/MODULE.md`      | A specific property failure needs investigating (multiverse debugging).    |
+| `workload`   | `references/workload/MODULE.md`   | Building or iterating on a workload.                                       |
+| `properties` | `references/properties/MODULE.md` | Importing existing properties (`import`) or defining a new one (`define`). |
 
 If there is no argument, infer the module from the request. If it is still ambiguous, ask.
 
@@ -21,5 +23,5 @@ If there is no argument, infer the module from the request. If it is still ambig
 
 If you are running on one of these platforms, read its notes before starting:
 
-- Devin: [platforms/devin.md](platforms/devin.md)
-- Replit: [platforms/replit.md](platforms/replit.md)
+- Devin: `references/platforms/devin.md`
+- Replit: `references/platforms/replit.md`

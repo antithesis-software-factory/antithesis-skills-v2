@@ -110,4 +110,4 @@ Numeric/boolean variants (e.g., `AlwaysGreaterThan`, `SometimesAll`) follow the 
 
 To further analyze a property failure, download the log leading up to the failure (or to a passing example, for comparison) and examine it.
 
-To learn how to download and understand logs, refer to `references/logs.md`.
+To learn how to download and understand logs, refer to `references/triage/logs.md`.

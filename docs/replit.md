@@ -7,22 +7,21 @@
 
   To share them across Apps, add them once as Account secrets (your account settings → Account secrets → New secret), then link them into each App.
 * Add the skills to your Replit Workspace: Settings → Customization → Skills → Add.
-  * If Add offers "Add from GitHub", use this URL and add both `antithesis` and `snouty`:
+  * If Add offers "Add from GitHub", use this URL and add the `antithesis` skill:
 
      ```
      https://github.com/antithesis-software-factory/antithesis-skills-v2/tree/master/plugins/antithesis/skills
      ```
 
-  * Otherwise, choose "Upload a skill" and upload each skill as a zip, with `SKILL.md` at the top level of the zip:
+  * Otherwise, choose "Upload a skill" and upload the skill as a zip, with `SKILL.md` at the top level of the zip:
 
      ```bash
      git clone https://github.com/antithesis-software-factory/antithesis-skills-v2
      cd antithesis-skills-v2/plugins/antithesis/skills
      (cd antithesis && zip -r ../antithesis.zip .)
-     (cd snouty && zip -r ../snouty.zip .)
      ```
 
-  Re-import or re-upload to pick up a new release. To use the skills in one App only, copy `antithesis` and `snouty` into the App's `.agents/skills/` directory instead.
+  Re-import or re-upload to pick up a new release. To use the skills in one App only, copy `antithesis` into the App's `.agents/skills/` directory instead.
 
 # Usage
 

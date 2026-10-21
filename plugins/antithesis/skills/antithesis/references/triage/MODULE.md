@@ -1,14 +1,14 @@
 # Triage an Antithesis run
 
-Input: an Antithesis run ID. If you were given something else, like a triage report URL or "the latest run", read `references/run-discovery.md` to find the run ID.
+Input: an Antithesis run ID. If you were given something else, like a triage report URL or "the latest run", read `references/triage/run-discovery.md` to find the run ID.
 
 Work through the run without asking the user for input unless you are blocked.
 
-The `references/` directory has detailed guides. Read each one only when a step below points to it.
+The `references/triage/` directory has detailed guides. Read each one only when a step below points to it.
 
 ## Setup
 
-Set up snouty with the `snouty` skill. You also need `jq`.
+Set up snouty with `references/antithesis/snouty-setup.md`. You also need `jq`.
 
 Check that snouty can reach Antithesis:
 
@@ -25,7 +25,7 @@ Continue only if the top-level `ok` is `true` and the `api_key` check's `status`
 - If `links.triage_report` is null or absent, no report was generated (typical for `cancelled` runs and some `unknown` or `starting` states). Report that the run can't be triaged; the properties and logs endpoints return 404 for these runs.
 - If the status is `incomplete`, follow "Diagnose an incomplete run" below instead.
 
-For a completed run, `snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
+For a completed run, `snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
 
 For a live run, `snouty runs properties` only returns results once the run completes. Instead, stream failures as they happen:
 
@@ -41,15 +41,15 @@ snouty --json runs search --follow -n 999 <run_id> 'filter(ev => ev.antithesis_a
 - When the run completes, check `runs properties` for `sometimes` and `reachable` properties. They fail by never being hit, so `--follow` never shows them.
 - If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
 
-Also check the `Software was instrumented` and `Symbols were uploaded` properties, and include the instrumentation status in your report. Read `references/instrumentation.md` to interpret them.
+Also check the `Software was instrumented` and `Symbols were uploaded` properties, and include the instrumentation status in your report. Read `references/triage/instrumentation.md` to interpret them.
 
 ## Investigate failed properties
 
 Triage each failing property in its own subagent.
 
-Read `references/logs.md` before downloading any logs. Then, for each failing property:
+Read `references/triage/logs.md` before downloading any logs. Then, for each failing property:
 
-1. Pick the first failing example and find its moment. If the counterexample has no `moment` (telemetry and meta properties, see `references/properties.md`), the counterexample value is the evidence; skip to step 4.
+1. Pick the first failing example and find its moment. If the counterexample has no `moment` (telemetry and meta properties, see `references/triage/properties.md`), the counterexample value is the evidence; skip to step 4.
 2. Download the log for that moment and analyze it locally.
 3. If you aren't sure what caused the failure, find more moments for the same property with `snouty runs search -n 999` and compare their logs. Logs from passing examples are useful for finding what differs between success and failure.
 4. Cross-reference the log against the source code of the system under test and the workload.
@@ -62,7 +62,7 @@ Pitfalls:
 
 ## Diagnose an incomplete run
 
-1. Look at `failure_moment` in `snouty --json runs show <run_id>`. If present, download a log for its `input_hash` and `vtime` as described in `references/logs.md`.
+1. Look at `failure_moment` in `snouty --json runs show <run_id>`. If present, download a log for its `input_hash` and `vtime` as described in `references/triage/logs.md`.
 2. Get the build logs with `snouty --json runs build-logs <run_id>`, especially if there is no failure moment, and look for errors.
 
 For incomplete runs the per-property endpoints usually return 404, but `links.triage_report` and `failure_moment` may still be set. Report what `show` actually contains.
@@ -147,4 +147,4 @@ Check your report against these:
 - Every property status you report came from the properties data, not inference.
 - Conclusions about failures with moments rest on log evidence, with specific log lines, timestamps and property names.
 - The report separates what the run shows from what you interpret.
-- A claim that a binary isn't instrumented follows `references/instrumentation.md` and doesn't rest only on the deduplicated examples of `Software was instrumented`.
+- A claim that a binary isn't instrumented follows `references/triage/instrumentation.md` and doesn't rest only on the deduplicated examples of `Software was instrumented`.
