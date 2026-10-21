@@ -34,3 +34,4 @@ The action generator never exits on its own. Antithesis decides how long each ti
    - stopping a system container (`docker stop`) makes the system's process shut down, not get killed after the timeout
 
    Fix anything that fails.
+8. **Close coverage gaps.** Launch a run, then use its coverage to find code the workload never reached, and fix the workload or deployment. Repeat until the remaining gaps are out of scope or rare. See `references/coverage-loop.md`.
