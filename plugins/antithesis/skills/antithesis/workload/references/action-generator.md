@@ -6,7 +6,7 @@ Hegel runs the workers in rounds. Each worker runs a few rules, and the next rou
 
 ## Example
 
-This drives a replicated key-value store with `PUT /k/<key>` and `GET /k/<key>` on any of its nodes. Copy its structure and replace the actions, model, and properties with ones for your system.
+This drives a replicated key-value store with `PUT /k/<key>` and `GET /k/<key>` on any of its nodes. The store promises linearizable reads, so the check accepts exactly the values a linearizable store could return. Copy the structure, but write the model and checks for **your system's documented guarantees**. A system with weaker guarantees, such as follower reads or eventual consistency, needs a looser check. Otherwise every correct response that a weaker system is allowed to give becomes a false failure.
 
 `Cargo.toml`:
 
@@ -30,6 +30,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const KEYS: usize = 8;
+const TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// One write the workload sent. `end` is when the system acknowledged it, or `None`
 /// if we never learned the outcome: such a write may take effect at any later time.
@@ -62,6 +63,24 @@ fn acceptable(got: Option<u32>, start: Instant, end: Instant, writes: &[Write]) 
     }
 }
 
+/// Drops writes that no read can return any more: those certainly overwritten by a write
+/// that finished well over a request timeout ago, so no read still in flight began before
+/// it. Keeps the check cheap in long runs. Unacknowledged writes are kept, since they may
+/// still take effect.
+fn prune(writes: &mut Vec<Write>) {
+    let now = Instant::now();
+    // Starts of writes that finished long enough ago (twice the timeout, for margin).
+    let settled: Vec<Instant> = writes
+        .iter()
+        .filter(|w| w.end.is_some_and(|e| now.duration_since(e) > 2 * TIMEOUT))
+        .map(|w| w.start)
+        .collect();
+    writes.retain(|w| match w.end {
+        None => true,
+        Some(e) => !settled.iter().any(|o_start| *o_start > e),
+    });
+}
+
 impl Workload {
     fn put(&self, node: usize, key: usize, value: u32) -> Result<(), ureq::Error> {
         self.http.put(&format!("{}/k/{key}", self.nodes[node])).send_string(&value.to_string()).map(|_| ())
@@ -84,14 +103,16 @@ impl Workload {
         let key = tc.draw(gs::integers::<usize>().max_value(KEYS - 1));
         // Unique values make every read attributable to exactly one write.
         let value = self.next_value.fetch_add(1, Ordering::Relaxed);
-        let i = {
-            let mut w = self.writes[key].lock().unwrap();
-            w.push(Write { value, start: Instant::now(), end: None });
-            w.len() - 1
-        };
+        self.writes[key].lock().unwrap().push(Write { value, start: Instant::now(), end: None });
         // A failed write may still be applied later, so it keeps `end: None`.
         if self.put(node, key, value).is_ok() {
-            self.writes[key].lock().unwrap()[i].end = Some(Instant::now());
+            let end = Instant::now();
+            let mut w = self.writes[key].lock().unwrap();
+            // Find the record by its value: pruning may have moved it.
+            if let Some(rec) = w.iter_mut().find(|r| r.value == value) {
+                rec.end = Some(end);
+            }
+            prune(&mut w);
         }
     }
 
@@ -129,7 +150,7 @@ fn main(tc: TestCase) {
     let workload = Workload {
         nodes,
         // Short, so a request to an unreachable node costs a moment, not a stalled round.
-        http: ureq::AgentBuilder::new().timeout(Duration::from_millis(1000)).build(),
+        http: ureq::AgentBuilder::new().timeout(TIMEOUT).build(),
         writes: (0..KEYS).map(|_| Mutex::new(Vec::new())).collect(),
         next_value: AtomicU32::new(0),
     };
@@ -148,22 +169,23 @@ fn main(tc: TestCase) {
 
 **Generate only.** Keep `phases = [hegel::Phase::Generate]` on `#[hegel::main]`. Shrinking re-runs the rules thousands of times against the live system.
 
-**Cover the surface you mapped.** Every in-scope operation and option from the surface table (`references/surface.md`) gets an action, or a draw inside an action. Requests that differ only in an option, like a read at a past version or a paginated list, are separate code paths in the system: draw the option, don't hard-code the common case.
+**Cover the surface you mapped.** Every in-scope operation and option from the surface table (`references/surface.md`) gets an action, or a draw inside an action. Requests that differ only in an option (an ack mode, an isolation level, a batch form, a filter) usually take separate code paths in the system: draw the option, don't hard-code the common case.
 
-**Let requests contend.** Bugs live where requests to the same data overlap. Don't serialize requests per key or per object to keep the model simple. Record when each request started and finished, and check responses against every outcome consistent with what overlapped them, as the example does. If the system orders operations itself (versions, revisions, sequence numbers, offsets), use that: record each acknowledged operation by its position, and check reads against that history.
+**Let requests contend.** Bugs live where requests to the same data overlap. Don't serialize requests per key or per object to keep the model simple. Record when each request started and finished, and check responses against every outcome consistent with what overlapped them, as the example does. If the system assigns its own order to operations (a log position, a sequence number, a commit timestamp), use it: record each acknowledged operation at its position, and check what reads and subscriptions return against that history.
 
 **Treat unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, possibly much later. Keep it as possible, never as failed.
 
 **Keep every rule fast.** Because of rounds, a rule that blocks stalls all workers.
-- Use short client timeouts, around a second, so a request to an unreachable node fails fast.
+- Use client timeouts that are short relative to the operation's normal latency, often around a second, so a request to an unreachable node fails fast. Operations that are slow by design (long polls, streams, schema changes, large batches) get their own longer timeout, or run as described below.
 - Send each request to a randomly drawn node, so one node being down doesn't stop the workload.
-- Don't sleep or poll inside a rule. A check that has to wait for something (expiry, convergence, recovery) should record what it expects and check it in a later rule, once the wait has passed.
+- Don't sleep or poll inside a rule. A check that has to wait for something (expiry, convergence, delivery) should record what it expects and check it in a later rule, once the wait has passed.
+- Long-lived interactions (subscriptions, streams, sessions, open transactions) live in the workload's state, not inside one rule. One rule opens them, other rules use, check or close them, and a background thread can drain a stream into a buffer that rules then check.
 
 **Put liveness checks in an `eventually_` command, not in the action generator.** "Every node serves requests again once faults stop" belongs in a separate `eventually_` command (see `references/harness.md`). Antithesis stops faults and kills the action generator before running it, so it can't use the action generator's model. Checks that need the model stay in rules.
 
 **Weight actions toward what's hard to reach.** Plain reads and writes run constantly anyway. Give options, background-feature triggers, and multi-step interactions enough weight that they happen many times in every timeline.
 
-**Mark interesting states with sometimes assertions.** For each situation that exercises a distinct path (a conditional write that loses a race, a read at an old version, a page boundary, an expired TTL, a cancelled stream, a request that fails over to another node), add an `assert_sometimes!`. They show which behaviors the run actually reached.
+**Mark interesting states with sometimes assertions.** For each situation that exercises a distinct path (a conditional operation that loses a race, a request that fails over to another node, a retry that succeeds, a background job running during a request, a subscription that resumes after a disconnect), add an `assert_sometimes!`. They show which behaviors the run actually reached.
 
 **Use `#[invariant(always_run)]`, not plain `#[invariant]`.** Hegel runs a plain invariant once on the initial state, and after that only with probability `1 / steps` per round, so with `.steps(i64::MAX)` it never runs again. An `always_run` invariant runs after every round, while no rules are running. Keep it cheap, because it runs often.
 

@@ -11,7 +11,7 @@ snouty --json runs show <run_id> > run.json
 jq '.results.coverage.files | keys' run.json
 ```
 
-`.results.coverage.files` maps each instrumented source file to the functions in it that ran at least once, each with the source spans reached (`[start_line, start_col, end_line, end_col]`). A file or function that never ran is simply absent. To see what's missing, compare against the system's source tree:
+`.results.coverage.files` maps each instrumented source file to the functions in it that ran at least once, each with the source spans reached (`[start_line, start_col, end_line, end_col]`). A file or function that never ran is simply absent. If the run has no coverage for the system's language, skip this loop and say so in the README. To see what's missing, compare against the system's source tree:
 
 1. **Modules, packages or directories with no reached file at all.**
 2. **Files that were reached, but where many of their functions are missing.**

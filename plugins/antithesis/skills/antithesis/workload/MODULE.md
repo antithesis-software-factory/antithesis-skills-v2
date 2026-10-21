@@ -29,7 +29,7 @@ The action generator never exits on its own. Antithesis decides how long each ti
 <!-- dev-only:end -->
 6. **Wire up the harness.** Add the `workload` container, the test template with its `eventually_` command, and the fault exclusion. See `references/harness.md`.
 7. **Check it locally.** Run the instrumentation checks from `references/instrumentation.md`, then `snouty validate` on the directory with `docker-compose.yaml`. Then run the action generator against `docker compose up` for a few minutes and check:
-   - every action completes successfully at least sometimes, and none routinely takes longer than about a second
+   - every action reaches its intended outcome at least sometimes (success, or the expected rejection for actions meant to fail), and none routinely takes much longer than the operation should
    - every sometimes assertion that doesn't depend on faults is reached
    - stopping a system container (`docker stop`) makes the system's process shut down, not get killed after the timeout
 

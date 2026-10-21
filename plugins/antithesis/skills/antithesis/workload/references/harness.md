@@ -47,7 +47,7 @@ exec /usr/local/bin/action-generator
 
 Make both executable. Don't add `parallel_driver_`, `serial_driver_` or `finally_` commands: concurrency belongs in the action generator.
 
-**The `eventually_` command.** Antithesis may run it at any point after the action generator has started. It first kills the action generator and stops all faults, and the timeline ends after it. Use it for liveness: every node of the system serves requests again, replicas converge, background work catches up. Build it as a second binary in the same crate (`src/bin/`), sharing the client code. Faults have only just stopped, so retry with a deadline (a minute or two) rather than failing on the first error, and report the outcome with an `assert_always!`.
+**The `eventually_` command.** Antithesis may run it at any point after the action generator has started. It first kills the action generator and stops all faults, and the timeline ends after it. Use it for liveness: every node of the system serves requests again, replicas converge, background work catches up. Build it as a second binary in the same crate (`src/bin/eventually-recovers.rs`), with the shared client code in `src/lib.rs`. Faults have only just stopped, so retry with a deadline (a minute or two) rather than failing on the first error, and report the outcome with an `assert_always!`.
 
 ## Setup complete
 
