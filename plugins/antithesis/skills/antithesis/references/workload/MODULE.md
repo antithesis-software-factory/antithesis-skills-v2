@@ -2,26 +2,35 @@
 
 Input: a system to test in Antithesis, and optionally the behaviors or properties to focus on.
 
-A workload is the code that exercises the system during a run. It sends requests, checks the responses, and asserts properties. Antithesis injects faults around it and explores many timelines.
-
-Work without asking the user for input unless you are blocked.
-
 ## How the workload is structured
 
-Every workload this module builds has the same shape:
+Every workload this module builds has these parts:
 
-- **One action generator.** A Rust binary written with [hegel](https://hegel.dev) using `#[hegel::main]`. It picks actions at random, sends them to the system, and checks each response against a model of what the system should contain. Use hegel for all random choices, so Antithesis controls them.
-- **An instrumented SUT.** Every SUT binary is built with Antithesis coverage instrumentation, so Antithesis knows which code each timeline reaches.
-- **Its own container.** The action generator runs alone in a `workload` container, which is excluded from faults. Faults still hit the system's own containers and the network between them.
-- **Started by Test Composer.** The action generator is the test template's only command, a `singleton_driver_`. Antithesis starts it once per timeline, after the system reports `setup_complete`. The action generator doesn't need to wait for the system to come up.
+- **One action generator.** A Rust binary written with [hegel](https://hegel.dev) using `#[hegel::main]`. It picks actions at random, has them sent to the system, and checks each response against a model of what the system should contain. Use hegel for all random choices, so Antithesis controls them.
+- **An instrumented SUT.** Instrument the system under test with Antithesis coverage instrumentation.
+- **Assertions on the system's logs.** Each system container's logs are forwarded to the action generator, which asserts on the system's internal state.
+- **Its own container.** The action generator runs alone in a `workload` container, which is excluded from faults, so it can always act and see everything.
+- **Started by Test Composer.** The action generator is the test template's `singleton_driver_` command. Antithesis starts it once per timeline, after the system reports `setup_complete`. The action generator doesn't need to wait for the system to come up. It also checks that the system recovers once faults stop, in quiet periods it starts itself.
+
+Who sends the requests depends on the system's client. If the client is simple, the action generator sends requests to the servers itself. If the client library takes part in the system's protocol, the real library runs in client containers that are faulted like the servers, and the action generator tells them what to do. `references/workload/clients.md` explains the difference and how to choose.
 
 The action generator never exits on its own. Antithesis decides how long each timeline runs.
 
 ## Steps
 
-1. **Pick what to test.** List the actions the workload will take, usually the system's public API calls. Decide what the model tracks and which properties to check against it. If a property catalog for this system already exists, start from that.
-2. **Build the SUT with instrumentation.** Read `references/workload/instrumentation.md` and instrument every SUT binary. This is required.
-3. **Report setup complete.** Make the system emit `setup_complete` once it is ready to serve requests. This belongs in the system's containers, not in the action generator. See `references/workload/harness.md`.
-4. **Write the action generator.** Read `references/workload/action-generator.md`. It has a complete example and the rules to follow.
-5. **Wire up the harness.** Add the `workload` container, the test template, and the fault exclusion. See `references/workload/harness.md`.
-6. **Check it locally.** Run the instrumentation checks from `references/workload/instrumentation.md`, then `snouty validate` on the directory with `docker-compose.yaml`. Fix anything either reports.
+1. **Map what the workload must reach**, and decide who talks to the system. Follow `references/workload/surface.md` and `references/workload/clients.md`.
+2. **Pick the model and properties** for every in-scope item. If a property catalog for this system exists, start from it.
+3. **Instrument the SUT**, including the client library if it runs in client containers. Follow `references/workload/instrumentation.md`.
+4. **Report setup complete** from the system's containers, once it can serve requests. See `references/workload/harness.md`.
+5. **Write the client program**, if the system's client takes part in its protocol. Follow `references/workload/clients.md`.
+6. **Write the action generator.** Follow `references/workload/action-generator.md`.
+<!-- dev-only:start -->
+   Also read `references/workload/action-log.md`, and log every action as it describes.
+<!-- dev-only:end -->
+7. **Wire up the harness.** Add the `workload` container, any client containers, the test template, and the fault exclusion. See `references/workload/harness.md`.
+8. **Build and validate.** Build the images, run the instrumentation checks, then `snouty validate`. Commit every file the images build from: check `git status --ignored`, since ignore rules can drop harness files.
+9. **Iterate locally** on coverage and the SDK assertions. Follow `references/workload/local-loop.md`.
+10. **Assert on the system's logs.** Follow `references/workload/system-logs.md`, then iterate locally again.
+11. **Iterate on short Antithesis runs.** Follow `references/workload/run-loop.md`.
+12. **Launch the final run**, 30 minutes long, and read it with the triage module.
+13. **Report to the user** the bugs the workload found, whether the workload drives client containers and why, any component left uninstrumented and why, and the coverage gaps you chose not to close.
