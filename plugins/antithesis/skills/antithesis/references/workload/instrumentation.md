@@ -9,7 +9,7 @@ Build every SUT binary with Antithesis coverage instrumentation. It's required: 
 - Add instrumentation tools and flags in the Antithesis Dockerfiles, not the project's own build.
 - If a component can't be instrumented, instrument the rest.
 
-The action generator doesn't need instrumentation. Its code isn't under test.
+The driver doesn't need instrumentation. Its code isn't under test.
 
 ## By language
 

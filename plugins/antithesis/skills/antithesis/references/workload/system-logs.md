@@ -1,6 +1,6 @@
 # Asserting on the system's logs
 
-The system's logs show what each node believes: who is leader, which term it's in, how far it has applied. A forwarder in each system container sends them to the workload, where a background thread in the action generator asserts properties over that state, and marks states across nodes worth exploring from.
+The system's logs show what each node believes: who is leader, which term it's in, how far it has applied. A forwarder in each system container sends them to the driver, where a background thread asserts properties over that state, and marks states across nodes worth exploring from.
 
 Client containers (`references/workload/clients.md`) are part of the system too. Forward their logs the same way.
 
@@ -8,11 +8,11 @@ Client containers (`references/workload/clients.md`) are part of the system too.
 
 Find the log lines that show the state your properties need, at any level. Turn on the level you need through the system's own configuration in `docker-compose.yaml`.
 
-Prefer lines that state current values over lines that announce a change. The action generator starts after `setup_complete`, so it misses early lines.
+Prefer lines that state current values over lines that announce a change. The driver starts after `setup_complete`, so it misses early lines.
 
 ## 2. Forward the logs
 
-Add a forwarder, `workload/log-forward/`, to the harness: a small Rust binary that
+Add a forwarder, `driver/log-forward/`, to the harness: a small Rust binary that
 
 - copies stdin to stdout, flushing each line;
 - sends each line to `LOG_FORWARD_ADDR` over UDP, as `{"node": <$HOSTNAME>, "boot": <id>, "seq": <n>, "line": <text>}`;
@@ -20,7 +20,7 @@ Add a forwarder, `workload/log-forward/`, to the harness: a small Rust binary th
 - counts `seq` from 0;
 - never blocks or exits on network errors. It resolves the address once, retrying at most once a second until it does, and drops lines it can't send.
 
-Run the system's command through it with `workload/forward-logs`, executable:
+Run the system's command through it with `driver/forward-logs`, executable:
 
 ```bash
 #!/usr/bin/env bash
@@ -34,25 +34,25 @@ In each system service's Antithesis Dockerfile, build the forwarder statically, 
 ```dockerfile
 FROM rust:1-bookworm AS log-forward
 RUN rustup target add x86_64-unknown-linux-musl
-COPY workload/log-forward/ /src/
+COPY driver/log-forward/ /src/
 RUN cd /src && cargo build --release --target x86_64-unknown-linux-musl
 
 # In the runtime stage:
 COPY --from=log-forward /src/target/x86_64-unknown-linux-musl/release/log-forward /usr/local/bin/
-COPY workload/forward-logs /usr/local/bin/
+COPY driver/forward-logs /usr/local/bin/
 ENTRYPOINT ["forward-logs", "kv-server"]
 ```
 
 - Setting `ENTRYPOINT` drops a `CMD` inherited from the base image. Restate it if there is one.
 - The wrapper needs bash.
 
-Set `LOG_FORWARD_ADDR=workload:7777` on each system service.
+Set `LOG_FORWARD_ADDR=driver:7777` on each system service.
 
 ## 3. Parse and assert
 
-In `main`, bind a UDP socket on port 7777 before starting the state machine, and parse lines on a background thread. Keep the node states behind an `Arc<Mutex<…>>` shared with the workload.
+In `main`, bind a UDP socket on port 7777 before starting the state machine, and parse lines on a background thread. Keep the node states behind an `Arc<Mutex<…>>` shared with the state machine.
 
-For the key-value store in `references/workload/action-generator.md`, if its nodes log `msg=raft-state term=3 role=leader commit=42`:
+For the key-value store in `references/workload/driver.md`, if its nodes log `msg=raft-state term=3 role=leader commit=42`:
 
 ```rust
 /// A node's state from one `raft-state` line, with the line's `boot` and `seq`.
@@ -66,7 +66,7 @@ struct NodeStates {
 
 impl NodeStates {
     fn record(&mut self, node: String, s: NodeState) {
-        assert_reachable!("the workload reads a node's state from its logs", &json!({}));
+        assert_reachable!("the driver reads a node's state from its logs", &json!({}));
         if s.role == "leader" {
             let first = self.leaders.entry(s.term).or_insert_with(|| node.clone());
             assert_always!(*first == node, "at most one leader per term",
@@ -94,7 +94,7 @@ impl NodeStates {
 }
 ```
 
-If nodes also log `msg=apply key=3 value=17`, check each applied value against the model as the line arrives. Share the action generator's `next_value` with the thread as an `Arc<AtomicU32>`. Values are drawn in order before they're sent, so every value the workload wrote is below it:
+If nodes also log `msg=apply key=3 value=17`, check each applied value against the model as the line arrives. Share the driver's `next_value` with the thread as an `Arc<AtomicU32>`. Values are drawn in order before they're sent, so every value the workload wrote is below it:
 
 ```rust
 assert_always!(value < next_value.load(Ordering::Relaxed), "nodes apply only values the workload wrote",

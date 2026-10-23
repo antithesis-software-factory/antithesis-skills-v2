@@ -18,13 +18,13 @@ Antithesis instrumentation records nothing outside Antithesis, so use the langua
 
 ## 2. Run the workload
 
-Start the coverage build from scratch, run the action generator for a few minutes with the SDK's local output on, then stop the system:
+Start the coverage build from scratch, run the driver for a few minutes with the SDK's local output on, then stop the system:
 
 ```bash
 C="docker compose -f docker-compose.yaml -f docker-compose.coverage.yaml"
 $C down -v && $C up -d --build --wait
-$C exec -e ANTITHESIS_SDK_LOCAL_OUTPUT=/tmp/sdk.jsonl workload timeout 300 action-generator
-$C cp workload:/tmp/sdk.jsonl .
+$C exec -e ANTITHESIS_SDK_LOCAL_OUTPUT=/tmp/sdk.jsonl driver timeout 300 driver
+$C cp driver:/tmp/sdk.jsonl .
 $C stop
 ```
 
@@ -70,7 +70,7 @@ Error-handling and recovery code will look unreached without faults; leave it to
 
 ## 5. Close the gaps
 
-- **A request the workload never sends:** add it to the action generator.
+- **A request the workload never sends:** add it to the driver.
 - **A rare condition** (an error path or race): act only if a different action mix would make it common.
 
 Repeat until the remaining gaps are rare conditions or out of scope.

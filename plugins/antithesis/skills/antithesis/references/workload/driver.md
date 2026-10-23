@@ -1,6 +1,6 @@
-# The action generator
+# The driver
 
-The action generator is a hegel concurrent state machine run from `#[hegel::main]`. Each `#[rule]` is one action: it draws its inputs, sends a request, and checks the response against the model. Hegel runs the rules on several worker threads, in rounds. The next round starts only when every worker is done, so one slow rule stalls them all.
+The driver is a hegel concurrent state machine run from `#[hegel::main]`. Each `#[rule]` is one action: it draws its inputs, sends a request, and checks the response against the model. Hegel runs the rules on several worker threads, in rounds. The next round starts only when every worker is done, so one slow rule stalls them all.
 
 ## Example
 
@@ -57,7 +57,7 @@ impl KeyHistory {
     }
 }
 
-struct Workload {
+struct Driver {
     nodes: Vec<String>,
     http: ureq::Agent,
     keys: Vec<Mutex<KeyHistory>>,
@@ -67,7 +67,7 @@ struct Workload {
 // Locks are held only to update or check a key's history, never during a request, so
 // requests to the same key overlap.
 #[hegel::concurrent_state_machine]
-impl Workload {
+impl Driver {
     #[rule(group = "ops", weight = 2.0)]
     fn put_value(&self, tc: TestCase) {
         let (node, key) = self.draw_target(&tc);
@@ -104,8 +104,8 @@ impl Workload {
 #[hegel::main(phases = [hegel::Phase::Generate])]
 fn main(tc: TestCase) {
     antithesis_init();
-    let workload = Workload { /* ... */ };
-    hegel::stateful::machine(workload)
+    let driver = Driver { /* ... */ };
+    hegel::stateful::machine(driver)
         .steps(i64::MAX)
         .max_concurrency(4)
         .run_concurrent(tc);
@@ -124,7 +124,7 @@ fn main(tc: TestCase) {
 
 ## Driving client containers
 
-With client containers (`references/workload/clients.md`), the rules above still hold, with the action generator sending commands to a client program instead of requests to the servers. A few things change:
+With client containers (`references/workload/clients.md`), the rules above still hold, with the driver sending commands to a client program instead of requests to the servers. A few things change:
 
 - **Each rule draws which client acts.** Bugs between clients need several of them acting on the same keys, locks or transactions.
 - **Outcomes arrive as events.** Tag each operation with an ID and wait for the response only up to the usual short timeout. A background thread receives the client programs' completion events on their own UDP port, separate from the logs, and resolves each operation in the model as its event arrives, the way `references/workload/system-logs.md` checks log lines as they arrive. An operation without an event stays unknown until its client's boot changes or the ambiguity window passes. A dropped event leaves its operation unknown, which is safe.
@@ -136,8 +136,8 @@ With client containers (`references/workload/clients.md`), the rules above still
 **Keep rules relatively fast:**
 - Use short timeouts. Give operations that are slow by design their own.
 - Don't sleep or poll. Record what you expect, and check it in a later rule. The one exception is a quiet period (below), which waits for recovery on purpose.
-- Keep long-lived interactions (streams, sessions, transactions) in the workload's state, across rules.
-- Run blocking operations (watches, long-polls, blocking pops) on a background thread, record the result in the workload's state, and check it in a later rule. Bounded retries that mirror a real client's are fine inside a rule.
+- Keep long-lived interactions (streams, sessions, transactions) in the driver's state, across rules.
+- Run blocking operations (watches, long-polls, blocking pops) on a background thread, record the result in the driver's state, and check it in a later rule. Bounded retries that mirror a real client's are fine inside a rule.
 
 **Check eventual properties only in quiet periods** (below). Properties that hold only once faults stop, like every node serving again or acknowledged writes being readable, fail falsely during faults.
 
@@ -171,13 +171,13 @@ Each message is one property in Antithesis, and assertions that share a message 
 
 - **Groups control overlap, not frequency.** Each round hegel picks one group, and every worker runs only its rules. Use separate groups only for rules that must never overlap. Groups can't be weighted.
 - **Weights are a hint** for the mix within a group, not a guarantee.
-- **Explicit draws set exact probabilities.** Use `tc.draw(gs::weighted_booleans(p))`, or a phase in the workload's state, when a rate matters.
+- **Explicit draws set exact probabilities.** Use `tc.draw(gs::weighted_booleans(p))`, or a phase in the driver's state, when a rate matters.
 
 Put a rare action in the main group behind a rare draw, not in its own group, which would get as many rounds as any other. If it must not overlap other operations, run it from the `always_run` invariant behind a rare draw, as the quiet period does.
 
 ## Quiet periods
 
-A quiet period pauses faults so the workload can check what should hold once the system recovers. Run the whole quiet period inside one call of an `#[invariant(always_run)]`. No rule runs until it returns, so its checks see a quiet system, and it can wait for recovery there. A per-round `weighted_booleans` draw starts quiet periods at a rate you choose. Pause faults with `ANTITHESIS_STOP_FAULTS <seconds>` for longer than the whole check takes; faults resume on their own afterwards. For the example above:
+A quiet period pauses faults so the driver can check what should hold once the system recovers. Run the whole quiet period inside one call of an `#[invariant(always_run)]`. No rule runs until it returns, so its checks see a quiet system, and it can wait for recovery there. A per-round `weighted_booleans` draw starts quiet periods at a rate you choose. Pause faults with `ANTITHESIS_STOP_FAULTS <seconds>` for longer than the whole check takes; faults resume on their own afterwards. For the example above:
 
 ```rust
 /// Chance per round of starting a quiet period. Measure rounds per second locally,

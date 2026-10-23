@@ -9,7 +9,7 @@ Launch a 5-minute run with the command in `references/workload/harness.md`, and 
 - **Instrumentation.** `Software was instrumented` and `Every instrumented module has symbols` should pass.
 - **Failing properties.** Early failures are usually the model being stricter than the system under faults, such as treating a timed-out write as lost. Apply the same rule as locally: keep a property that catches the system breaking a promise, and fix one that demands more than the system promises.
 - **Behavior that needs faults.** Sometimes assertions that need faults are reached, and quiet periods start, recover and pass.
-- **Client failures.** Clients restart and get partitioned during runs, and the action generator handles it. A reachable assertion where it notices a new boot makes this easy to check.
+- **Client failures.** Clients restart and get partitioned during runs, and the driver handles it. A reachable assertion where it notices a new boot makes this easy to check.
 - **Coverage** of code only faults reach, and of services local coverage couldn't measure:
   ```bash
   snouty --json runs show <run_id> > run.json
