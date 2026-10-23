@@ -15,7 +15,7 @@ Launch a 5-minute run with the command in `references/workload/harness.md`, and 
   snouty --json runs show <run_id> > run.json
   jq '.results.coverage.files | keys' run.json
   ```
-  For Go, Rust and C/C++, `.results.coverage.files` maps each instrumented file, by its build path, to the functions that ran, with the spans reached (`[start_line, start_col, end_line, end_col]`). Code that never ran is absent.
+  For Go, Rust and C/C++, `.results.coverage.files` maps each instrumented file, by its build path, to the functions that ran, with the spans reached (`[start_line, start_col, end_line, end_col]`).
 
 ## 3. Fix and repeat
 
