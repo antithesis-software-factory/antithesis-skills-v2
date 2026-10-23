@@ -46,7 +46,7 @@ Make it executable.
 
 ## Client containers
 
-If the real client library runs in client containers (`references/workload/clients.md`), add one service per client, built from the client program:
+Add one service per client container (`references/workload/clients.md`), built from the client program:
 
 ```yaml
   client1:

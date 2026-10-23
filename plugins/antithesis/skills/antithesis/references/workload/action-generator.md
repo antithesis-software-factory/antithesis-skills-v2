@@ -4,7 +4,7 @@ The action generator is a hegel concurrent state machine run from `#[hegel::main
 
 ## Example
 
-This drives a replicated key-value store, with `PUT /k/<key>` and `GET /k/<key>` on any node, that promises linearizable reads.
+This drives a replicated key-value store with no client library, with `PUT /k/<key>` and `GET /k/<key>` on any node, that promises linearizable reads.
 
 Depend on `hegeltest` with `features = ["static-engine"]`, and on `antithesis_sdk`. Left out below: the HTTP client (`put`, `get`), reading the node list from `KV_URLS`, `draw_target` (a node and one of `KEYS` keys), and `KeyHistory`'s `sent`, `acked` and `overlaps` (a write was in flight during the read). `acked` finds its write by value, since pruning may have moved it.
 
@@ -124,7 +124,7 @@ fn main(tc: TestCase) {
 
 ## Driving client containers
 
-When the real client library runs in client containers (`references/workload/clients.md`), the rules above still hold, with the action generator sending commands to a client program instead of requests to the servers. A few things change:
+With client containers (`references/workload/clients.md`), the rules above still hold, with the action generator sending commands to a client program instead of requests to the servers. A few things change:
 
 - **Each rule draws which client acts.** Bugs between clients need several of them acting on the same keys, locks or transactions.
 - **Outcomes arrive as events.** Tag each operation with an ID and wait for the response only up to the usual short timeout. A background thread receives the client programs' completion events on their own UDP port, separate from the logs, and resolves each operation in the model as its event arrives, the way `references/workload/system-logs.md` checks log lines as they arrive. An operation without an event stays unknown until its client's boot changes or the ambiguity window passes. A dropped event leaves its operation unknown, which is safe.

@@ -4,7 +4,7 @@ Build every SUT binary with Antithesis coverage instrumentation. It's required: 
 
 ## Rules
 
-- Instrument the binaries that run in the SUT's containers, and make sure the runtime image runs the instrumented build. When the real client library runs in client containers, it's code under test too: instrument the client program with it.
+- Instrument the binaries that run in the SUT's containers, and make sure the runtime image runs the instrumented build. The client library is code under test too: instrument the client program with it.
 - Put symbol files in `/symbols` of the runtime image where the language needs them, or artifacts in `/opt/antithesis/catalog/` for languages Antithesis instruments itself.
 - Add instrumentation tools and flags in the Antithesis Dockerfiles, not the project's own build.
 - If a component can't be instrumented, instrument the rest.
@@ -13,48 +13,18 @@ The action generator doesn't need instrumentation. Its code isn't under test.
 
 ## By language
 
-Read the current page for the language with `snouty docs` first.
+Follow the language's page in the Antithesis docs, including its validation step. The overview, with the list of supported languages, is `snouty docs show /docs/product/writing_tests/instrumentation/coverage_instrumentation/`.
 
-**Go** (`snouty docs show /docs/reference/sdk/go/instrumentation/`)
-- Add the SDK module and install the instrumentor in the build stage: `go get github.com/antithesishq/antithesis-sdk-go@latest` and `go install github.com/antithesishq/antithesis-sdk-go/tools/antithesis-go-toolexec@latest`.
-- Build with `-toolexec=antithesis-go-toolexec` added to the existing `go build`. The default mode does coverage instrumentation.
-- Build with `CGO_ENABLED=1` and a C compiler; with cgo disabled, coverage is silently lost. Prefer glibc base images over Alpine.
-- Copy the symbol files it writes into the runtime image: `COPY --from=build /symbols /symbols`.
+- **Go:** `/docs/reference/sdk/go/instrumentation/`
+- **Rust:** `/docs/reference/sdk/rust/instrumentation/`
+- **C and C++:** `/docs/reference/sdk/cpp/instrumentation/`
+- **Java:** `/docs/reference/sdk/java/how_to_build_with_sdk/`
+- **.NET:** `/docs/reference/sdk/dotnet/instrumentation/`
+- **JavaScript (Node):** `/docs/reference/sdk/javascript_sdk/`
+- **Python:** `/docs/reference/sdk/python/`
+- **Other languages compiled through LLVM:** `/docs/reference/sdk/fallback/`
 
-**Rust** (`snouty docs show /docs/reference/sdk/rust/instrumentation/`)
-- Add the `antithesis-instrumentation` crate and reference it once (`use antithesis_instrumentation as _;`).
-- Build with the coverage flags, in `.cargo/config.toml`:
-  ```toml
-  [build]
-  target = "x86_64-unknown-linux-gnu"
-
-  [target.x86_64-unknown-linux-gnu]
-  rustflags = [
-      "-Ccodegen-units=1",
-      "-Cpasses=sancov-module",
-      "-Cllvm-args=-sanitizer-coverage-level=3",
-      "-Cllvm-args=-sanitizer-coverage-trace-pc-guard",
-      "-Clink-args=-Wl,--build-id",
-  ]
-  ```
-- Put the unstripped binary or its debug info in `/symbols`.
-- Check: `nm <binary> | grep antithesis_load_libvoidstar` prints a `T antithesis_load_libvoidstar` line.
-
-**C and C++** (`snouty docs show /docs/reference/sdk/cpp/instrumentation/`)
-- Include `antithesis_instrumentation.h` in exactly one translation unit.
-- Compile with `-fsanitize-coverage=trace-pc-guard -g`, and link with `-Wl,--build-id`.
-- Put the binary or its debug info in `/symbols`.
-- Check with `nm <binary> | grep antithesis_load_libvoidstar`.
-
-**Java, .NET, JavaScript (Node)**
-- Antithesis instruments these itself. Put the built artifacts in `/opt/antithesis/catalog/`.
-- Start Java apps with `java -cp …`, not `java -jar`.
-
-**Python**
-- No coverage instrumentation yet.
-
-**Other languages compiled through LLVM**
-- The C/Rust sanitizer-coverage flags may work, with the binary in `/symbols`. Not fully supported.
+If the project builds with link-time optimization, use the page's link-time instructions. Compile-time instrumentation doesn't survive LTO.
 
 ## Checking it
 
