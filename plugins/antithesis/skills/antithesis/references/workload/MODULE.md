@@ -24,9 +24,6 @@ The action generator never exits on its own. Antithesis decides how long each ti
 4. **Report setup complete** from the system's containers, once it can serve requests. See `references/workload/harness.md`.
 5. **Write the client program**, if the system's client takes part in its protocol. Follow `references/workload/clients.md`.
 6. **Write the action generator.** Follow `references/workload/action-generator.md`.
-<!-- dev-only:start -->
-   Also read `references/workload/action-log.md`, and log every action as it describes.
-<!-- dev-only:end -->
 7. **Wire up the harness.** Add the `workload` container, any client containers, the test template, and the fault exclusion. See `references/workload/harness.md`.
 8. **Build and validate.** Build the images, run the instrumentation checks, then `snouty validate`. Commit every file the images build from: check `git status --ignored`, since ignore rules can drop harness files.
 9. **Iterate locally** on coverage and the SDK assertions. Follow `references/workload/local-loop.md`.
