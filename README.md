@@ -1,4 +1,4 @@
-# antithesis-skills-v2
+# antithesis-plugin
 
 Antithesis skills, packaged as one plugin for each agent platform.
 

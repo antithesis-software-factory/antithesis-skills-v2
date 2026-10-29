@@ -10,14 +10,14 @@
   * If Add offers "Add from GitHub", use this URL and add the `antithesis` skill:
 
      ```
-     https://github.com/antithesis-software-factory/antithesis-skills-v2/tree/master/plugins/antithesis/skills
+     https://github.com/antithesishq/antithesis-plugin/tree/main/plugins/antithesis/skills
      ```
 
   * Otherwise, choose "Upload a skill" and upload the skill as a zip, with `SKILL.md` at the top level of the zip:
 
      ```bash
-     git clone https://github.com/antithesis-software-factory/antithesis-skills-v2
-     cd antithesis-skills-v2/plugins/antithesis/skills
+     git clone https://github.com/antithesishq/antithesis-plugin
+     cd antithesis-plugin/plugins/antithesis/skills
      (cd antithesis && zip -r ../antithesis.zip .)
      ```
 

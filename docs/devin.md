@@ -9,7 +9,7 @@
   * ANTITHESIS_TENANT
   * ANTITHESIS_REPOSITORY (GAR repository url)
   * ANTITHESIS_GAR_KEY
-* Install the plugin: Customize → Plugins → Add plugin → From repository. Enter `antithesis-software-factory/antithesis-skills-v2` and the subdirectory `plugins/antithesis`.
+* Install the plugin: Customize → Plugins → Add plugin → From repository. Enter `antithesishq/antithesis-plugin` and the subdirectory `plugins/antithesis`.
   * Choose to either install it on the enterprise, organization, or personal scope
 * Create an automation with a webhook trigger (Automations → New automation → Webhook), with this prompt. Save the webhook URL and secret; the secret is shown only once.
 
@@ -34,7 +34,7 @@
 * Launch Antithesis runs with the webhook as the run-start callback:
 
    ```bash
-   snouty launch --webhook advanced_test ... \
+   snouty launch --launcher advanced_test ... \
      --param custom.callback.run_start.url=$DEVIN_WEBHOOK_URL \
      --param custom.callback.run_start.token=$DEVIN_WEBHOOK_SECRET
    ```
