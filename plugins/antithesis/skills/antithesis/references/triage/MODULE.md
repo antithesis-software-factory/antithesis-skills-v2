@@ -57,9 +57,6 @@ Read `references/triage/logs.md` before downloading any logs. Then, for each fai
 
 The property status and assertion text alone are not enough. Download and read the logs before concluding on any failure that has moments. If a property has a "details" section, use it: its author chose those fields to show the system's state at the failure.
 
-Pitfalls:
-- `runs logs` needs an exact moment. Pass `input_hash` and `vtime` verbatim. Negative hashes need `--` before them.
-
 ## Diagnose an incomplete run
 
 1. Look at `failure_moment` in `snouty --json runs show <run_id>`. If present, download a log for its `input_hash` and `vtime` as described in `references/triage/logs.md`.
