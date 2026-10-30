@@ -4,7 +4,7 @@
 
 Antithesis provides a time travelling debug environment, which allows scripts to be run at arbitrary Moments in the Multiverse. When starting the debug process, first figure out which moment(s) and run(s) you want to investigate.
 
-If you are trying to debug a property failure, you can search Antithesis for passing and failing moments associated with the property using `snouty runs search`. You can pull interesting moments from a timeline via `snouty runs logs`.
+If you are trying to debug a property failure, you can search Antithesis for passing and failing moments associated with the property using `snouty runs search`. On a live run, `snouty runs stream` gives counterexample moments as they happen. You can pull interesting moments from a timeline via `snouty runs logs`.
 
 ## Choosing a run to execute commands in
 
