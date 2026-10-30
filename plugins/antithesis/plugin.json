@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "antithesis",
+  "version": "0.0.7",
+  "description": "Antithesis plugin - write tests, triage runs, debug failures, and interact with Antithesis",
+  "author": { "name": "Antithesis", "url": "https://antithesis.com" },
+  "homepage": "https://github.com/antithesishq/antithesis-plugin",
+  "repository": "https://github.com/antithesishq/antithesis-plugin",
+  "license": "Apache-2.0",
+  "keywords": ["antithesis", "testing"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Antithesis",
+        "shortDescription": "Antithesis plugin - write tests, triage runs, debug failures, and interact with Antithesis",
+        "developerName": "Antithesis",
+        "category": "Coding",
+        "websiteURL": "https://antithesis.com"
+      }
+    }
+  }
+}

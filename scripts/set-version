@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Set or check the plugin version in every manifest.
+
+`plugins/antithesis/plugin.json` holds the canonical version.
+
+    scripts/set-version 1.2.3    write 1.2.3 into every manifest
+    scripts/set-version --check  exit 1 if a manifest disagrees with the canonical version
+"""
+import json
+import re
+import sys
+from pathlib import Path
+
+PLUGIN = Path(__file__).resolve().parent.parent / "plugins" / "antithesis"
+CANONICAL = PLUGIN / "plugin.json"
+MANIFESTS = [
+    CANONICAL,
+    PLUGIN / ".claude-plugin" / "plugin.json",
+    PLUGIN / ".devin-plugin" / "plugin.json",
+]
+VERSION = re.compile(r'("version":\s*")[^"]*(")')
+
+
+def main() -> int:
+    if sys.argv[1:] == ["--check"]:
+        expected = json.loads(CANONICAL.read_text())["version"]
+        wrong = [p for p in MANIFESTS if json.loads(p.read_text()).get("version") != expected]
+        for path in wrong:
+            print(f"{path.relative_to(PLUGIN.parent.parent)}: version is not {expected}")
+        return 1 if wrong else 0
+    if len(sys.argv) != 2 or not re.fullmatch(r"\d+\.\d+\.\d+", sys.argv[1]):
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    for path in MANIFESTS:
+        text, count = VERSION.subn(rf"\g<1>{sys.argv[1]}\g<2>", path.read_text(), count=1)
+        if count != 1:
+            print(f"{path}: no version field", file=sys.stderr)
+            return 1
+        path.write_text(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
