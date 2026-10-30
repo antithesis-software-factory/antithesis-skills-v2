@@ -25,21 +25,11 @@ Continue only if the top-level `ok` is `true` and the `api_key` check's `status`
 - If `links.triage_report` is null or absent, no report was generated (typical for `cancelled` runs and some `unknown` or `starting` states). Report that the run can't be triaged; the properties and logs endpoints return 404 for these runs.
 - If the status is `incomplete`, follow "Diagnose an incomplete run" below instead.
 
-For a completed run, `snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
+`snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
 
-For a live run, `snouty runs properties` only returns results once the run completes. Instead, stream failures as they happen:
+If the run is `in_progress`, don't wait for it to finish. Follow `snouty runs stream --help` to get the current results and new ones as they arrive.
 
-```bash
-snouty --json runs search --follow -n 999 <run_id> 'filter(ev => ev.antithesis_assert?.hit
-  && ev.antithesis_assert.condition === false && ev.antithesis_assert.assert_type != "sometimes")'
-```
-
-- `--follow` replays past matches, then prints new ones.
-- `antithesis_assert.id` is the property name.
-- Triage each property as soon as its first failure appears. Don't wait for the run to complete.
-- `--follow` exits when the run finishes, or after 999 events. If `runs show` says the run is still in progress, reconnect and exclude properties already seen with `&& !["<id>", ...].includes(ev.antithesis_assert.id)`.
-- When the run completes, check `runs properties` for `sometimes` and `reachable` properties. They fail by never being hit, so `--follow` never shows them.
-- If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
+If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
 
 Also check the `Software was instrumented` and `Symbols were uploaded` properties, and include the instrumentation status in your report. Read `references/triage/instrumentation.md` to interpret them.
 
