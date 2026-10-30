@@ -37,5 +37,5 @@ jobs:
           if gh release view "v$version" > /dev/null 2>&1; then
             echo "v$version is already released"
           else
-            gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" --generate-notes
+            gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" --notes ""
           fi
