@@ -1,44 +1,32 @@
 # Triage an Antithesis run
 
-Input: an optional mode, then an Antithesis run ID. If you were given something else, like a triage report URL or "the latest run", read `references/triage/run-discovery.md` to find the run ID.
+Input: an optional mode, then an Antithesis run ID. If you were given something else, like a link to the run or "the latest run", read `references/triage/run-discovery.md` to find the run ID.
 
 Work through the run without asking the user for input unless you are blocked.
 
 The `references/triage/` directory has detailed guides. Read each one only when a step points to it.
 
-## Setup
-
-Set up snouty with `references/antithesis/snouty-setup.md`. You also need `jq`.
-
-Check that snouty can reach Antithesis:
-
-```bash
-snouty doctor --json
-```
-
-Continue only if the top-level `ok` is `true` and the `api_key` check's `status` is `ok`. Otherwise report the failing check's `message` and stop.
-
 ## Find the run
 
-`snouty --json runs show <run_id>` gives the run's status, metadata and links.
+`snouty runs show <run_id>` gives the run's status and metadata.
 
 - If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
 - If the status is `starting`, wait for it with `snouty runs wait --until ready <run_id>`.
-- If the status is `incomplete`, follow "Diagnose an incomplete run" below instead.
+- If the status is `incomplete`, also follow "Diagnose an incomplete run" below.
 
 ## Pick a mode
 
-| Mode         | Read                              | Use when                                                                              |
-| ------------ | --------------------------------- | ------------------------------------------------------------------------------------- |
-| `monitor`    | `references/triage/monitor.md`    | The run is in progress. Report and triage failures as they arrive.                    |
-| `summary`    | `references/triage/summary.md`    | The run has finished. Summarize its failures and what's new.                          |
+| Mode         | Read                              | Use when                                                                             |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------------------ |
+| `monitor`    | `references/triage/monitor.md`    | The run is in progress. Report and triage failures as they arrive.                   |
+| `summary`    | `references/triage/summary.md`    | The run has finished. Summarize its failures and what's new.                         |
 | `root-cause` | `references/triage/root-cause.md` | One failing property or anomaly, in a running or finished run, needs its root cause. |
 
 If no mode is given, use `monitor` for an `in_progress` run and `summary` for a finished one.
 
 ## Read the properties
 
-`snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
+`snouty runs properties <run_id> --detail` lists every property with its status, its pass and fail counts, and its example moments. Add `--failing` to list only the failing ones. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
 
 If the run is `in_progress`, don't wait for it to finish. Follow `snouty runs stream --help` to get the current results and new ones as they arrive.
 
@@ -60,10 +48,10 @@ The property status and assertion text alone are not enough. Download and read t
 
 ## Diagnose an incomplete run
 
-1. Look at `failure_moment` in `snouty --json runs show <run_id>`. If present, download a log for its `input_hash` and `vtime` as described in `references/triage/logs.md`.
-2. Get the build logs with `snouty --json runs build-logs <run_id>`, especially if there is no failure moment, and look for errors.
+An incomplete run can still have property results. Read them as for any run, and triage any failing properties as usual. Then:
 
-For incomplete runs the per-property endpoints usually return 404, but `links.triage_report` and `failure_moment` may still be set. Report what `show` actually contains.
+1. Look for `Failure Hash`, `Failure VTime` and `Failure Reason` in `snouty runs show <run_id>`. If there is a failure moment, download a log for it as described in `references/triage/logs.md`.
+2. Get the build logs with `snouty runs build-logs <run_id>`, especially if there is no failure moment, and look for errors.
 
 ## Report
 

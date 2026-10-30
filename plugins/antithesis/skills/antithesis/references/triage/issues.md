@@ -19,7 +19,7 @@ Write for a maintainer who knows this codebase but not Antithesis or this run. L
 
 ## Details
 
-* Antithesis run: `<run id>`
+* Antithesis run: [`<run id>`](<run link>)
 * Input hash: `<input hash>`
 * vtime: `<vtime>`
 * Version: <git hash>
@@ -30,6 +30,8 @@ Write for a maintainer who knows this codebase but not Antithesis or this run. L
 <fingerprint>
 -->
 ```
+
+<run link> is `https://<tenant>.antithesis.com/run?run_id=<run id>`, with the tenant from `snouty settings show`.
 
 ## Reproducer
 
@@ -63,10 +65,10 @@ If the bug already exists, edit the issue to add a bullet point to its <duplicat
 <details><summary>Details</summary>
 <p>
 
-* `run id`
+* [`run id`](run link)
 
 </p>
 </details>
 ```
 
-and is only present if there are any duplicates, so you may have to create it. Do not include any content in each bullet other than `run id`.
+and is only present if there are any duplicates, so you may have to create it. Do not include any content in each bullet other than the linked `run id`.

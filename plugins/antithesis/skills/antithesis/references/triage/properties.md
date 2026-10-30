@@ -1,82 +1,40 @@
 # Property queries
 
-Use `snouty runs --json properties` to retrieve properties and `snouty runs --json logs` to download a log of a specific history. The `properties` return data will give you what you need to get the logs.
+Use `snouty runs properties` to retrieve properties and `snouty runs --json logs` to download a log of a specific history. The properties output gives you the moments you need to get the logs.
 
 ## Getting all properties
 
-Use `snouty runs --json properties FLAGS "${RUN_ID}"` to download all the properties for a run.
+`snouty runs properties "${RUN_ID}" --detail` lists every property for a run, failing first. Narrow with `--failing`, `--name` or `--group`:
 
-Example return:
-
-```json
-{
-  "counterexample_count": 11,
-  "counterexamples": [
-    {
-      "moment": {
-        "input_hash": "1953917995480797787",
-        "vtime": "182.42924608523026"
-      }
-    },
-    {
-      "moment": {
-        "input_hash": "4038006772091147322",
-        "vtime": "181.52766803186387"
-      }
-    },
-    {
-      "moment": {
-        "input_hash": "7249623954355301396",
-        "vtime": "181.67649806430563"
-      }
-    }
-  ],
-  "description": "Property description goes here.",
-  "example_count": 1731,
-  "examples": [
-    {
-      "moment": {
-        "input_hash": "6247583012788407497",
-        "vtime": "231.3688659959007"
-      }
-    }
-  ],
-  "is_event": true,
-  "is_group": true,
-  "name": "Invariant: expected record exists in FDB",
-  "status": "Failing"
-}
+```
+Name      a query returns exactly the records that match it
+ID        0116733fdcb05189119ccc536aad4044
+Group     Always assertions
+Category  Antithesis SDK
+Status    failing
+Examples  showing 1 out of 261 passing examples and 1 out of 16 failing examples
+  STATUS   HASH                 VTIME
+  failing  494832216310308818   139.0624840699602
+  passing  3296738555862413105  117.73925844929181
 ```
 
-A "counterexample" is a case where a property FAILED to hold.
-An "example" is a case where a property DID hold.
+- `Name` is the name of the property as it appears in the run's page in Antithesis and as it is known to the user.
+- `Status` is `passing`, `failing`, or `undetermined` (not triggered yet).
+- `Examples` gives the number of passing examples (times the property PASSED) and failing examples, or counterexamples (times it FAILED). These counts are from across all the histories in the run, not just the few example moments shown for the property.
 
-- `example_count` gives the number of times the property PASSED
-- `counterexample_count` gives the number of times the property FAILED.
+Each row is a moment: its `HASH` is the input hash and its `VTIME` the vtime. These let you retrieve the log of the history leading up to the property's pass or failure.
 
-These are from across all the histories in the run (not just the 3-4 example rows returned for the property in the property list).
+> **Note:** Not every property has moments. Telemetry / meta properties — e.g. `Hypervisor utilization`, `Customer output volume`, `Fault injector total packets`, `Symbols were uploaded`, `Assertions are present in customer code`, `Fuzzing has branches`, `Unique Edges`, `The Test Composer was used` — report a result value — a scalar (number, boolean, string) or a summary object (e.g. `{session_id, total_output_mb, ...}`) — instead of moments. There is no per-history log to download for these; the counterexample value itself is the evidence. Skip the log-download step for these properties and report the value directly.
 
-- `name` is the name of the property as it appears in the triage report and as it is known to the user.
-
-- `counterexamples`: This field contains an array of a _select_ number of counterexamples from the run.
-
-- `examples`: This field contains array of a _select_ number of passing examples of the property from the run.
-
-- `moment` (in the `example` and `counterexample` items): This information allows you to retrieve the logs from the history
-  leading up to the property pass or failure.
-
-> **Note:** Not every property has moments. Telemetry / meta properties — e.g. `Hypervisor utilization`, `Customer output volume`, `Fault injector total packets`, `Symbols were uploaded`, `Assertions are present in customer code`, `Fuzzing has branches`, `Unique Edges`, `The Test Composer was used` — report counterexamples as scalars (numbers, booleans, strings) or summary objects (e.g. `{session_id, total_output_mb, ...}`) instead of `{moment: {...}}`. There is no per-history log to download for these; the counterexample value itself is the evidence. Skip the log-download step for these properties and report the value directly.
-
-Each property may expose multiple example rows (typically 3-4), mixing failing
-and passing examples. When triaging, start with the **first failing example**
-(usually index 0) by default. Cross-referencing a passing example can help
+Each property may expose a few example rows, mixing failing and passing
+examples. When triaging, start with the **first failing example** by default. Cross-referencing a passing example can help
 narrow down root cause by showing what's different in a healthy execution. If you want more
 examples, find more moments for the property with `snouty runs search` (see the triage
 module's "Investigate failed properties") and download their logs.
 
 ### Using pass/fail ratios for triage prioritization
 
-For a given property, you can examine the pass/fail counts to help investigate the property. (Remember these are communicated in the `example_count` and `counterexample_count` fields in the property information.)
+For a given property, you can examine the pass/fail counts to help investigate the property. (Remember these are the counts on the `Examples` line.)
 
 - **All failing (0 passing)** — Likely a setup or workload bug. The property is being violated in every execution history.
 - **Mostly failing with rare passes** — Most likely a setup or workload bug, or for some reason the system under test is not set up for
