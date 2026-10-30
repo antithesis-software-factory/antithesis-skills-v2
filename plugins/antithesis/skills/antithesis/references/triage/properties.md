@@ -74,14 +74,6 @@ narrow down root cause by showing what's different in a healthy execution. If yo
 examples, find more moments for the property with `snouty runs search` (see the triage
 module's "Investigate failed properties") and download their logs.
 
-### Filtering properties
-
-`snouty runs --json properties` supports several filters (combine them as needed):
-
-- `--passing` / `--failing` — only passing or only failing properties.
-- `--name <substr>` — only properties whose name contains the substring (case-insensitive).
-- `--group <substr>` — only properties whose group contains the substring (case-insensitive).
-
 ### Using pass/fail ratios for triage prioritization
 
 For a given property, you can examine the pass/fail counts to help investigate the property. (Remember these are communicated in the `example_count` and `counterexample_count` fields in the property information.)
