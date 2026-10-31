@@ -25,10 +25,6 @@ Write for a maintainer who knows this codebase but not Antithesis or this run. L
 * Version: <git hash>
 
 <duplicate_details>
-
-<!-- antithesis-triage-fingerprint
-<fingerprint>
--->
 ```
 
 <run link> is `https://<tenant>.antithesis.com/run?run_id=<run id>`, with the tenant from `snouty settings show`.
@@ -39,21 +35,9 @@ Write a reproducer for the bug and put it in <reproducer>. A reproducer is code 
 
 If writing a reproducer would be too hard, don't write one, and instead silently leave out the Reproducer section entirely.
 
-## Fingerprint
-
-<fingerprint> is a hidden block of text that lets future agents disambiguate future bugs they see against existing reported bugs:
-
-```
-properties:
-  * <failing antithesis property names, one bullet each>
-related_code:
-  * <function involved in the failure, one bullet each, as path/from/repo/root::function, or path::Type::method. No line numbers.>
-root_cause: <a few short sentences explaining the bug's root cause, enough to tell whether another failure is the same bug, but not more>
-```
-
 ## Duplicates
 
-Search the destination for existing issues before reporting. The fingerprints are helpful here to disambiguate different issues and decide if the bug is a duplicate of any of them.
+Search the destination for existing issues before reporting.
 
 If the bug already exists, edit the issue to add a bullet point to its <duplicate_details>.
 

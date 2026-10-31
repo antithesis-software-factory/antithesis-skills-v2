@@ -31,40 +31,21 @@ $C stop
 ## 3. Check the behavior
 
 - **Actions.** Every action reaches its intended outcome sometimes, and none is routinely slow.
-- **Properties.** Only sometimes assertions that need faults should fail. This lists every property that would fail in a run:
+- **Assertions.** Only sometimes assertions for situations that need faults should be unmet. This lists every assertion that would fail in a run:
   ```bash
   jq -rs '[.[].antithesis_assert // empty] | group_by(.message)[]
     | select(if .[0].assert_type == "sometimes" then any(.hit and .condition) | not
              else any(.hit and (.condition | not)) or (.[0].must_hit and (any(.hit) | not)) end)
     | "\(.[0].display_type)\t\(.[0].message)"' sdk.jsonl
   ```
-  When a property fails, read the system's code for that request. If the system breaks a promise, keep the property: it found a real bug. If the property demands more than the system promises, fix the property.
-- **Quiet periods.** One forced on passes against the healthy system.
+  An unmet sometimes assertion means the workload doesn't reach that situation: change the actions or their mix.
+- **Quiet periods.** One forced on finds the healthy system recovered.
 - **System logs.** All the logs that we expect to see, arrive.
 - **Shutdown.** `docker stop` on a system container shuts its process down rather than killing it.
 
 ## 4. Read the coverage
 
-After the system stops, generate the reports from the `coverage` volume, in the coverage Dockerfile's build stage, which has the binary, its sources and the tools:
-
-```bash
-docker build -f <service>/Dockerfile.coverage --target build -t <service>-coverage-build .
-docker run --rm -v <project>_coverage:/coverage <service>-coverage-build sh -c '<report commands below>'
-```
-
-`<project>` is the Compose project name, by default the directory name.
-
-**Rust:**
-
-```bash
-bin=$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin
-$bin/llvm-profdata merge -sparse /coverage/<service>/*.profraw -o /tmp/m.profdata
-$bin/llvm-cov report --show-functions -Xdemangler=c++filt -instr-profile=/tmp/m.profdata <binary> src/
-```
-
-Pass the system's own source directories, so dependencies stay out. To list only the functions that never ran, use `llvm-cov export -format=text` with the same arguments, and keep the functions whose `count` is 0.
-
-**Go**, in the module directory: `go tool covdata textfmt -i=/coverage/<service> -o /tmp/cov.txt && go tool cover -func=/tmp/cov.txt`.
+After the system stops, use the language's coverage tool on the `coverage` volume to list the functions in the system's own source that never ran. E.g., `llvm-cov` for Rust, C and C++, and `go tool cover` for Go.
 
 Error-handling and recovery code will look unreached without faults; leave it to the Antithesis runs.
 
