@@ -1,0 +1,10 @@
+# Root-cause one failure
+
+Input: a failing property or anomaly in the run, named in the request. If none is named, pick the failing property most likely to be a real bug, using the pass/fail ratios in `references/triage/properties.md`.
+
+1. Investigate it, following "Investigate a failing property". For an anomaly that isn't a property, find its moments with `snouty runs search` first.
+2. If the logs don't explain it, run commands at the failing moment and around it. See `references/debug/MODULE.md`.
+3. If this run can't answer it, launch a targeted run that can, for example with more logging around the suspect code, or a workload that drives the failing path harder. Use the original run's parameters, which `snouty runs show` lists. Then investigate the same property in that run.
+4. Stop once evidence from a run shows the cause, not only the code.
+
+Report the cause as "Report" describes.
