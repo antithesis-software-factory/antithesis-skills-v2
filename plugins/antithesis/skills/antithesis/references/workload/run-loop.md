@@ -2,7 +2,9 @@
 
 ## 1. Launch a short run
 
-Launch a 5-minute run with the command in `references/workload/harness.md`, and read it with the triage module.
+Launch a run with the smallest compute budget, `--max-compute-hours 12` on the standard tier (15 minutes of fuzzing). Follow `references/launch/MODULE.md`, use the launcher and fault exclusions in `references/workload/harness.md`, and read the run with the triage module.
+
+If a run fails because the system didn't reach setup complete within `--setup-timeout`, find out why setup is slow and fix it, rather than raising the timeout. A setup slower than 10 minutes fails a default property even when the timeout allows it.
 
 ## 2. Check the results
 
@@ -21,4 +23,4 @@ Launch a 5-minute run with the command in `references/workload/harness.md`, and 
 
 Run the local loop again after every change, then launch the next run. A few runs are usually enough.
 
-A 5-minute run reaches little of the system's state, so don't worry too much about failing sometimes assertions for rare conditions. Common sometimes assertions should still fire.
+A short run reaches little of the system's state, so don't worry too much about failing sometimes assertions for rare conditions. Common sometimes assertions should still fire.

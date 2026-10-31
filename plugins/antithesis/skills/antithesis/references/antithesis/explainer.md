@@ -32,16 +32,10 @@ All Antithesis runs can be used by real-time commands like `snouty runs exec`, `
 
 Snouty is the official Antithesis CLI.
 
-### Installation and setup
-
-Check that snouty is installed and setup by ensuring the `snouty` binary is on the path and `snouty doctor` works.
-
-Load `references/antithesis/snouty-setup.md` to install or configure snouty.
-
 ### Commands
 
 When using `snouty` follow these rules:
 
 1. Discovery commands dynamically via `snouty --help`
 2. Read the subcommand's documentation via `snouty <cmd...> --help` before use
-3. Always pass `--json` for machine readable output
+3. Pass `--detail` to every command that takes it. Pass `--json` instead only when you pipe the output into `jq` or another program. JSON costs several times as many tokens and carries mostly fields you don't need, while `--detail` keeps what the default output leaves out, such as assertion details

@@ -1,43 +1,42 @@
 # Triage an Antithesis run
 
-Input: an Antithesis run ID. If you were given something else, like a triage report URL or "the latest run", read `references/triage/run-discovery.md` to find the run ID.
+Input: an optional mode, then an Antithesis run ID. If you were given something else, like a link to the run or "the latest run", read `references/triage/run-discovery.md` to find the run ID.
 
 Work through the run without asking the user for input unless you are blocked.
 
-The `references/triage/` directory has detailed guides. Read each one only when a step below points to it.
+The `references/triage/` directory has detailed guides. Read each one only when a step points to it.
 
-## Setup
+## Find the run
 
-Set up snouty with `references/antithesis/snouty-setup.md`. You also need `jq`.
+`snouty runs show <run_id>` gives the run's status and metadata.
 
-Check that snouty can reach Antithesis:
+- If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
+- If the status is `starting`, wait for it with `snouty runs wait --until ready <run_id>`.
+- If the status is `incomplete`, also follow "Diagnose an incomplete run" below.
 
-```bash
-snouty doctor --json
-```
+## Pick a mode
 
-Continue only if the top-level `ok` is `true` and the `api_key` check's `status` is `ok`. Otherwise report the failing check's `message` and stop.
+| Mode         | Read                              | Use when                                                                             |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------------------ |
+| `monitor`    | `references/triage/monitor.md`    | The run is in progress. Report and triage failures as they arrive.                   |
+| `summary`    | `references/triage/summary.md`    | The run has finished. Summarize its failures and what's new.                         |
+| `root-cause` | `references/triage/root-cause.md` | One failing property or anomaly, in a running or finished run, needs its root cause. |
 
-## Find failing properties
+If no mode is given, use `monitor` for an `in_progress` run and `summary` for a finished one.
 
-`snouty --json runs show <run_id>` gives the run's status, metadata and links.
+## Read the properties
 
-- If `links.triage_report` is null or absent, no report was generated (typical for `cancelled` runs and some `unknown` or `starting` states). Report that the run can't be triaged; the properties and logs endpoints return 404 for these runs.
-- If the status is `incomplete`, follow "Diagnose an incomplete run" below instead.
-
-`snouty --json runs properties <run_id>` lists every property, one JSON object per line. Failing ones have `"status": "Failing"` and example moments. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
+`snouty runs properties <run_id> --detail` lists every property with its status, its pass and fail counts, and its example moments. Add `--failing` to list only the failing ones. Read `references/triage/properties.md` for the format, the assertion types, and what pass/fail ratios suggest.
 
 If the run is `in_progress`, don't wait for it to finish. Follow `snouty runs stream --help` to get the current results and new ones as they arrive.
 
-If the run can't be found, wait 10 seconds and retry. A run can take a while to appear in the API after it starts.
+If a `completed` or `cancelled` run has no properties, it has no results to triage. Report that and stop.
 
 Also check the `Software was instrumented` and `Symbols were uploaded` properties, and include the instrumentation status in your report. Read `references/triage/instrumentation.md` to interpret them.
 
-## Investigate failed properties
+## Investigate a failing property
 
-Triage each failing property in its own subagent.
-
-Read `references/triage/logs.md` before downloading any logs. Then, for each failing property:
+Read `references/triage/logs.md` before downloading any logs. Then:
 
 1. Pick the first failing example and find its moment. If the counterexample has no `moment` (telemetry and meta properties, see `references/triage/properties.md`), the counterexample value is the evidence; skip to step 4.
 2. Download the log for that moment and analyze it locally.
@@ -49,89 +48,20 @@ The property status and assertion text alone are not enough. Download and read t
 
 ## Diagnose an incomplete run
 
-1. Look at `failure_moment` in `snouty --json runs show <run_id>`. If present, download a log for its `input_hash` and `vtime` as described in `references/triage/logs.md`.
-2. Get the build logs with `snouty --json runs build-logs <run_id>`, especially if there is no failure moment, and look for errors.
+An incomplete run can still have property results. Read them as for any run, and triage any failing properties as usual. Then:
 
-For incomplete runs the per-property endpoints usually return 404, but `links.triage_report` and `failure_moment` may still be set. Report what `show` actually contains.
+1. Look for `Failure Hash`, `Failure VTime` and `Failure Reason` in `snouty runs show <run_id>`. If there is a failure moment, download a log for it as described in `references/triage/logs.md`.
+2. Get the build logs with `snouty runs build-logs <run_id>`, especially if there is no failure moment, and look for errors.
 
-## Report issues
+## Report
 
-Report one issue for each root cause among the failed properties. Do not report multiple issues for the same root cause, even if multiple properties failed.
+Follow `references/triage/issues.md` to report what you found.
 
-By default, use the following format for reporting issues. If the user has specified a particular place or format of how to report issues, use that instead. If the user has not specified where to report issues, print the report in the session instead. The following format is written with GitHub in mind; adapt any GitHub-specific syntax for other destinations as appropriate.
+## Before you report
 
-Write for a maintainer who knows this codebase but not Antithesis or this run. Lead with what's wrong and where. Explain one representative occurrence in the code's terms. Put supporting evidence in a collapsed `<details>` block. Don't describe how you investigated.
+Check each report against these:
 
-```
-# <title>
-
-<antithesis property name that failed>
-
-<description of bug>
-
-## Reproduction
-
-<reproducer>
-
-## Details
-
-* Antithesis run: `<run id>`
-* Input hash: `<input hash>`
-* vtime: `<vtime>`
-* Version: <git hash>
-
-<duplicate_details>
-
-<!-- antithesis-triage-fingerprint
-<fingerprint>
--->
-```
-
-### Reproducer
-
-Write a reproducer for the bug and put it in <reproducer>. A reproducer is code that the maintainer can run to reproduce the bug that does not involve Antithesis. Prose explanations or instructions are not reproducers. Run the reproducer and ensure it reproduces the bug before including it in the report. Don't commit it to the repository.
-
-If writing a reproducer would be too hard, don't write one, and instead silently leave out the Reproducer section entirely.
-
-### Fingerprint
-
-<fingerprint> is a hidden block of text that lets future agents disambiguate future bugs they see against existing reported bugs:
-
-```
-properties:
-  * <failing antithesis property names, one bullet each>
-related_code:
-  * <function involved in the failure, one bullet each, as path/from/repo/root::function, or path::Type::method. No line numbers.>
-root_cause: <a few short sentences explaining the bug's root cause, enough to tell whether another failure is the same bug, but not more>
-```
-
-### Duplicates
-
-Before reporting, search the destination for duplicate issues. The fingerprints are helpful here to disambiguate different issues and decide if the bug is a duplicate of any of them.
-
-If the bug already exists, edit the issue to add a bullet point to its <duplicate_details>.
-
-<duplicate_details> has the following format:
-
-```
-## Other Antithesis runs
-
-<details><summary>Details</summary>
-<p>
-
-* `run id`
-
-</p>
-</details>
-```
-
-and is only present if there are any duplicates, so you may have to create it. Do not include any content in each bullet other than `run id`.
-
-## Before you finish
-
-Check your report against these:
-
-- Every property status you report came from the properties data, not inference.
-- Conclusions about failures with moments rest on log evidence, with specific log lines, timestamps and property names.
+- Every property status you report came from the properties data or the stream, not inference.
+- Conclusions about failures with moments rest on evidence from the run, with specific log lines or command output, timestamps and property names.
 - The report separates what the run shows from what you interpret.
 - A claim that a binary isn't instrumented follows `references/triage/instrumentation.md` and doesn't rest only on the deduplicated examples of `Software was instrumented`.

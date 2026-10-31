@@ -5,9 +5,9 @@ Use this guide to verify that the system under test (SUT) and the workload are i
 ## Step 1: check the setup properties
 
 ```bash
-snouty runs --json properties --name "software was instrumented" "${RUN_ID}"
-snouty runs --json properties --name "symbols were uploaded" "${RUN_ID}"
-snouty runs --json properties --name "thread pausing was enabled" "${RUN_ID}"
+snouty runs properties --detail --name "software was instrumented" "${RUN_ID}"
+snouty runs properties --detail --name "symbols were uploaded" "${RUN_ID}"
+snouty runs properties --detail --name "thread pausing was enabled" "${RUN_ID}"
 ```
 
 All three are meta properties. Their examples carry values, not moments, so there is no log to download.

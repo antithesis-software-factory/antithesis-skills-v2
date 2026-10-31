@@ -29,5 +29,5 @@ The driver never exits on its own. Antithesis decides how long each timeline run
 9. **Iterate locally** on coverage and the SDK assertions. Follow `references/workload/local-loop.md`.
 10. **Assert on the system's logs.** Follow `references/workload/system-logs.md`, then iterate locally again.
 11. **Iterate on short Antithesis runs.** Follow `references/workload/run-loop.md`.
-12. **Launch the final run**, 30 minutes long, and read it with the triage module.
+12. **Launch the final run** with `--max-compute-hours 24` on the standard tier (30 minutes of fuzzing). Follow `references/launch/MODULE.md`, and read the run with the triage module.
 13. **Report to the user**.

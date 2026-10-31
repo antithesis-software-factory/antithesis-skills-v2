@@ -3,12 +3,12 @@
 ## How to obtain a list of runs on the tenant
 
 ```sh
-snouty runs --json list -n 200 [OPTIONS]
+snouty runs list -n 200 [OPTIONS]
 ```
 
-Use `-n 200` as the default page size. Snouty's built-in default page size is too small for triage — it can miss the run when matching a triage-report URL (rule 3) or when looking for the oldest non-triaged run (rule 4). Bump higher (e.g. `-n 500` or `-n 1000`) if a search at 200 still doesn't find what the user is asking for.
+Use `-n 200` as the default page size. Snouty's built-in default page size is too small for triage — it can miss the run when looking for the oldest non-triaged run (rule 4). Bump higher (e.g. `-n 500` or `-n 1000`) if a search at 200 still doesn't find what the user is asking for.
 
-You may use `snouty runs list --help` to see the other OPTIONS. The `--status` option is useful if you know the status. `snouty runs list` returns runs with one of the following statuses: `starting`, `in_progress`, `completed`, `cancelled`, `incomplete`, `unknown`. The status `incomplete` usually means the run failed to start for some reason and the failure can be triaged. To determine whether ANY run is triageable, check `links.triage_report` in the run's JSON: if a report URL is present, a report was generated and you can proceed with triage. If `links` is null or `triage_report` is absent, no report exists.
+Run `snouty runs list --help` to learn about statuses and other options. The `--status` option is useful if you know the status. The status `incomplete` usually means the run failed to start for some reason and the failure can be triaged.
 
 ## How to tell what run_id the user wants to use
 
@@ -26,33 +26,15 @@ Apply these rules, in order.
    run the user is asking for. Take into account the webhooks and sources you
    have been using with this user. See the notes below.
 
-3. If the user provides a triage report URL, look up the run_id by matching
-   the URL against `links.triage_report` in the runs list.
-
-   A report URL looks like:
+3. If the user provides a link to a run, take the run_id from it. A run link looks like:
 
    ```
-   https://<TENANT_ID>.antithesis.com/report/***/***.html?auth=<AUTH_TOKEN>
+   https://<TENANT_ID>.antithesis.com/run?run_id=<run_id>
    ```
 
-   You should verify the `TENANT_ID` matches snouty's resolved tenant (shown by `snouty doctor --json`) before proceeding. If it does not match, then `snouty` will not be able to find the run.
+   Verify that the `TENANT_ID` matches snouty's tenant (shown by `snouty settings show`) before proceeding. If it does not match, `snouty` will not be able to find the run.
 
-   Everything before the `?auth=` query string is stable per run. Thus, use this pattern to find the run id for a provided URL:
-
-   ```bash
-   URL='<paste full URL from user>'
-   snouty runs --json list -n 200 \
-     | jq -r --arg url "$URL" \
-         'select(.links.triage_report // "" | startswith($url | split("?")[0])) | .run_id'
-   ```
-
-   The output is the `run_id`. If the command prints nothing, the run is
-   older than the last 200 runs — retry with `-n 500` or `-n 1000`. If it
-   still does not match, the report URL is for a different tenant or the
-   run is no longer listed; ask the user to supply the run_id directly (the
-   run_id is in the bottom section of the Triage Report).
-
-4. If the user did not provide an explicit triage report or run id, use the oldest non-triaged run, if you know whether runs were triaged or not. If you do not know which runs have been triaged, use the most recently completed run.
+4. If the user did not provide a run link or run id, use the oldest non-triaged run, if you know whether runs were triaged or not. If you do not know which runs have been triaged, use the most recently completed run.
 
 ### Notes
 

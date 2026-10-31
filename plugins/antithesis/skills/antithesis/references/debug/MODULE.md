@@ -11,7 +11,7 @@ If you are trying to debug a property failure, you can search Antithesis for pas
 Antithesis can execute a command in any run that is ready, however there is value in picking a run that already has the moment warm. Follow this policy when picking a run to execute commands in:
 
 1. The run must have status `in_progress` and sub-status `ready`. You can either use `snouty runs show` or `snouty runs wait --until ready` to check.
-2. Prefer runs that already have rewarmed the desired moment. Use `snouty --json runs search <run_id> 'filter(ev => ev.moment.input_hash == "<hash>")' --count` to check. If that returns non-zero, all moments from the branch are warm.
+2. Prefer runs that already have rewarmed the desired moment. Use `snouty runs search <run_id> 'filter(ev => ev.moment.input_hash == "<hash>")' --count` to check. If that returns non-zero, all moments from the branch are warm.
 3. Prefer reusing a ready run over starting a new run.
 4. If there is no in_progress & ready run available, spin up a dedicated debug run using `snouty debug`.
 
@@ -20,6 +20,8 @@ Running commands does not prevent runs from exiting. If the run exits while you 
 ## Executing commands
 
 You can execute an arbitrary bash command at a given moment using `snouty runs exec`. This is a powerful tool for exploration and debugging.
+
+The command runs in the workload's containers inside the run, not on your machine. It can use only the tools installed in those images, which may not match what you have locally. Process its output on your machine instead, if the tool you need isn't there.
 
 As part of its output, `snouty runs exec` prints an "end moment", which is the moment where the command finished executing. You can use this moment to execute follow-up commands in the same timeline.
 

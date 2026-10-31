@@ -77,14 +77,12 @@ Every timeline starts from the state at the moment something reports `setup_comp
 
 ## Exclude the driver container from faults
 
-Exclude the driver container from faults with `advanced_test` parameters:
+Exclude the driver container from faults with these `advanced_test` parameters. Launch every run of the workload with the `advanced_test` launcher and these parameters, following `references/launch/MODULE.md`:
 
 ```bash
-snouty launch --launcher advanced_test --config . --duration <minutes> \
-  --param 'custom.network_fault_exclusion_patterns=^driver$' \
-  --param custom.container_status_fault_exclusions=driver \
-  --param custom.container_cpu_fault_exclusions=driver \
-  ...
+--param 'custom.network_fault_exclusion_patterns=^driver$'
+--param custom.container_status_fault_exclusions=driver
+--param custom.container_cpu_fault_exclusions=driver
 ```
 
 The container and CPU exclusions take exact container names. To exclude several containers from network faults, use `^a$|^b$`. Don't use parentheses (due to a bug).
