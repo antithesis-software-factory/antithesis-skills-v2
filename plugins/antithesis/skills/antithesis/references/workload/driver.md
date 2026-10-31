@@ -1,6 +1,6 @@
 # The driver
 
-The driver is a hegel concurrent state machine run from `#[hegel::main]`. Each `#[rule]` is one action: it draws its inputs, sends a request, and checks the response against the model. Hegel runs the rules on several worker threads, in rounds. The next round starts only when every worker is done, so one slow rule stalls them all.
+The driver is a hegel concurrent state machine run from `#[hegel::main]`. Each `#[rule]` is one action: it draws its inputs, sends a request, and records the outcome in the model. Hegel runs the rules on several worker threads, in rounds. The next round starts only when every worker is done, so one slow rule stalls them all.
 
 ## Example
 
@@ -19,24 +19,13 @@ const AMBIGUITY_WINDOW: Duration = Duration::from_secs(60);
 /// learned the outcome, in which case it may still take effect.
 struct Write { value: u32, sent: Instant, acked: Option<Instant> }
 
-/// Every write sent to one key. A read that ran from `start` to `end` may return:
-/// - a value, if its write was sent before the read ended and wasn't overwritten before
-///   the read started;
-/// - nothing, if no write had been acknowledged before the read started.
-///
-/// A write is overwritten before time `t` if another write was sent after it was
-/// acknowledged, and was itself acknowledged before `t`.
+/// Every write sent to one key.
 #[derive(Default)]
 struct KeyHistory { writes: Vec<Write> }
 
 impl KeyHistory {
-    fn may_return(&self, got: Option<u32>, start: Instant, end: Instant) -> bool {
-        match got {
-            None => !self.writes.iter().any(|w| w.acked.is_some_and(|a| a < start)),
-            Some(v) => self.writes.iter().any(|w| w.value == v && w.sent < end && !self.overwritten_before(w, start)),
-        }
-    }
-
+    /// A write is overwritten before time `t` if another write was sent after it was
+    /// acknowledged, and was itself acknowledged before `t`.
     fn overwritten_before(&self, w: &Write, t: Instant) -> bool {
         let Some(w_acked) = w.acked else { return false }; // it could still land later
         self.writes.iter().any(|o| o.sent > w_acked && o.acked.is_some_and(|a| a < t))
@@ -91,11 +80,6 @@ impl Driver {
         let Ok(got) = self.get(node, key) else { return }; // a failed read tells us nothing
         let end = Instant::now();
         let history = self.keys[key].lock().unwrap();
-        assert_always!(
-            history.may_return(got, start, end),
-            "a read returns the latest acknowledged write or one that overlapped it",
-            &json!({"node": node, "key": key, "got": got})
-        );
         assert_sometimes!(got.is_some(), "read finds a written key", &json!({"key": key}));
         assert_sometimes!(history.overlaps(start, end), "a read overlaps a write to the same key", &json!({"key": key}));
     }
@@ -115,19 +99,18 @@ fn main(tc: TestCase) {
 ## Rules
 
 - **Run forever.** Call `.steps(i64::MAX)`; the default stops after 50 rounds and the binary exits. Don't use `tc.repeat`.
-- **Report properties with Antithesis SDK assertions**, never by panicking. Put the values you'd need to debug a failure in the details.
+- **Use Antithesis SDK assertions, never panics.** Put the values you'd need to debug in the details.
 - **Generate only.** Keep `phases = [hegel::Phase::Generate]` on `#[hegel::main]`.
 - **Cover the surface you mapped.** Draw options; don't hard-code the common case.
-- **Let requests contend.** Don't serialize requests per key to keep the model simple. Check each response against every outcome consistent with what overlapped it, as the example does. If the system orders operations itself (log positions, sequence numbers), check against that history.
-- **Derive properties from what this system promises:** its docs, its API contract, and what its real clients rely on. Check each against the system's code. Implementations often promise less than what they imitate.
-- **Treat unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, now or later.
+- **Let requests contend.** Don't serialize requests per key to keep the model simple. Record when each request was sent and when its outcome arrived, so a property can allow every outcome consistent with what overlapped it. If the system orders operations itself (log positions, sequence numbers), record that order too.
+- **Record unknown outcomes as unknown.** A request that timed out or lost its connection may or may not have taken effect, now or later.
 
 ## Driving client containers
 
 With client containers (`references/workload/clients.md`), the rules above still hold, with the driver sending commands to a client program instead of requests to the servers. A few things change:
 
 - **Each rule draws which client acts.** Bugs between clients need several of them acting on the same keys, locks or transactions.
-- **Outcomes arrive as events.** Tag each operation with an ID and wait for the response only up to the usual short timeout. A background thread receives the client programs' completion events on their own UDP port, separate from the logs, and resolves each operation in the model as its event arrives, the way `references/workload/system-logs.md` checks log lines as they arrive. An operation without an event stays unknown until its client's boot changes or the ambiguity window passes. A dropped event leaves its operation unknown, which is safe.
+- **Outcomes arrive as events.** Tag each operation with an ID and wait for the response only up to the usual short timeout. A background thread receives the client programs' completion events on their own UDP port, separate from the logs, and resolves each operation in the model as its event arrives, the way `references/workload/system-logs.md` handles log lines as they arrive. An operation without an event stays unknown until its client's boot changes or the ambiguity window passes. A dropped event leaves its operation unknown, which is safe.
 - **Bursts are cheap.** Since outcomes arrive as events, a rule can send several operations to one client without waiting for their responses. That gets the library batching beyond what the worker count allows.
 - **A changed boot identifier means the client restarted.** Everything outstanding on its old boot gets an unknown outcome, and the model forgets that client's sessions, locks and open transactions. Unknown includes what the client believed: a client that was paused, not restarted, may still think it holds a lock that has since expired.
 - **An unreachable client is normal.** It may be paused or mid-restart. Treat commands to it as unknown, and keep driving the other clients.
@@ -139,17 +122,22 @@ With client containers (`references/workload/clients.md`), the rules above still
 - Keep long-lived interactions (streams, sessions, transactions) in the driver's state, across rules.
 - Run blocking operations (watches, long-polls, blocking pops) on a background thread, record the result in the driver's state, and check it in a later rule. Bounded retries that mirror a real client's are fine inside a rule.
 
-**Check eventual properties only in quiet periods** (below). Properties that hold only once faults stop, like every node serving again or acknowledged writes being readable, fail falsely during faults.
-
 **Weight actions toward what's hard to reach**, so options and rare interactions happen many times in every timeline.
 
 **Use `#[invariant(always_run)]`, not plain `#[invariant]`.** With `.steps(i64::MAX)`, a plain invariant effectively never runs. An `always_run` invariant runs after every round, while no rules run, and every round waits for it.
 
-## Choosing assertions
+## Guiding exploration
 
-- **`assert_always!`**: a property that should always be true.
-- **`assert_always_or_unreachable!`**: a property that should always be true, but is rare enough that it may not get hit. This is the same as `assert_always!` but does not fail if it doesn't get hit. Only use when you would otherwise use `assert_always!` but do not want false positive errors from not reaching the code.
-- **`assert_sometimes!`**: a condition that should be true at least once per test run. Sometimes assertions are useful for checking that tests exercise meaningful scenarios, not just particular pieces of code. Examples:
+The assertions the workload writes aren't properties. A property says what the system must do, and its failure is a bug; properties come from the properties module. The workload's assertions mark states worth reaching. Their failure means the workload never reached that state.
+
+They matter for two reasons:
+
+- **They show what the workload reaches.** Coverage shows which code ran. These show which situations happened: a read overlapping a write to the same key, a leader change while a follower lags.
+- **Antithesis explores from them.** They mark interesting states for Antithesis.
+
+The assertions:
+
+- **`assert_sometimes!`**: a situation that should happen at least once per run. Examples:
     - A leader election is triggered
     - A transaction aborts
     - A rate limiter rejects a request
@@ -159,13 +147,18 @@ With client containers (`references/workload/clients.md`), the rules above still
     - A compaction runs while reads are in flight
     - Two clients edit the same document at the same time
 
-  If both scenarios A and ~A (A game is sometimes won and sometimes lost) are possible, add sometimes assertions for both.
+  If both a situation and its opposite are possible (a game is sometimes won and sometimes lost), add one for each.
 
-- **`assert_reachable!`**: equivalent to `assert_sometimes!(true, ...)`.
-- **`assert_unreachable!`**: something that should never happen.
-- **Numeric and boolean forms** (`assert_sometimes_greater_than!`, `assert_sometimes_all!`, `assert_always_some!`, and so on): any always or sometimes condition that's a comparison or a combination. They tell Antithesis how close the condition came and guide its search.
+- **`assert_reachable!`**: code that should run at least once. The same as `assert_sometimes!(true, ...)`.
+- **Numeric and boolean forms** (`assert_sometimes_greater_than!`, `assert_sometimes_all!`, and so on): a situation that's a comparison or a combination, like a follower falling more than 10 entries behind. They tell Antithesis how close each moment came, which guides its search better than true or false.
 
-Each message is one property in Antithesis, and assertions that share a message merge into it. Keep messages fixed and put changing values in the details.
+Where to put them:
+
+- **On the rare outcome of every action** in the surface you mapped, and on both sides of every option.
+- **On situations that need faults**, so a run shows whether faults reached them.
+- **On combinations no single request shows**, from the model or the nodes' state in the logs (`references/workload/system-logs.md`).
+
+Each message is one assertion in Antithesis, and assertions that share a message merge into it. Keep messages fixed and put changing values in the details.
 
 ## Choosing how often things happen
 
@@ -177,7 +170,7 @@ Put a rare action in the main group behind a rare draw, not in its own group, wh
 
 ## Quiet periods
 
-A quiet period pauses faults so the driver can check what should hold once the system recovers. Run the whole quiet period inside one call of an `#[invariant(always_run)]`. No rule runs until it returns, so its checks see a quiet system, and it can wait for recovery there. A per-round `weighted_booleans` draw starts quiet periods at a rate you choose. Pause faults with `ANTITHESIS_STOP_FAULTS <seconds>` for longer than the whole check takes; faults resume on their own afterwards. For the example above:
+A quiet period pauses faults so the system can recover. Properties that hold only once faults stop, like every node serving again or acknowledged writes being readable, are checked there. Run the whole quiet period inside one call of an `#[invariant(always_run)]`. No rule runs until it returns, so the checks see a quiet system, and it can wait for recovery there. A per-round `weighted_booleans` draw starts quiet periods at a rate you choose. Pause faults with `ANTITHESIS_STOP_FAULTS <seconds>` for longer than the whole check takes; faults resume on their own afterwards. For the example above:
 
 ```rust
 /// Chance per round of starting a quiet period. Measure rounds per second locally,
@@ -197,23 +190,7 @@ fn quiet_period(&self, tc: TestCase) {
     // Restarted containers take a while to come back. Retry each node until it serves,
     // or until DEADLINE. With client containers, wait for them too.
     let healthy: Vec<bool> = self.wait_for_nodes(DEADLINE);
-    let recovered = !healthy.contains(&false);
-    assert_always!(recovered, "every node serves requests again once faults stop", &json!({"healthy": healthy}));
-    if !recovered {
-        return;
-    }
-    // Every node serves and no rule is running: check the model.
-    for key in 0..KEYS {
-        let start = Instant::now();
-        let Ok(got) = self.get(0, key) else { return }; // a failed read tells us nothing
-        let end = Instant::now();
-        assert_always!(
-            self.keys[key].lock().unwrap().may_return(got, start, end),
-            "acknowledged writes survive once faults stop",
-            &json!({"key": key, "got": got})
-        );
-    }
-    assert_reachable!("the system recovered after faults stopped", &json!({}));
+    assert_sometimes!(!healthy.contains(&false), "the system recovered after faults stopped", &json!({"healthy": healthy}));
 }
 ```
 
