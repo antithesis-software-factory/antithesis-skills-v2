@@ -18,12 +18,28 @@ Antithesis instrumentation records nothing outside Antithesis, so use the langua
 
 ## 2. Run the workload
 
-Start the coverage build from scratch, run the driver for a few minutes with the SDK's local output on, then stop the system:
+In `docker-compose.coverage.yaml`, also set `ANTITHESIS_SDK_LOCAL_OUTPUT=/tmp/sdk.jsonl` on the driver, so it writes its assertions to a file.
+
+Locally, nothing runs `first_open_gate`, so the snapshot gate would never open. Have it open on `setup_complete` instead, which is what precedes it in Antithesis. In the same override, give the container that reports setup and the gate a shared `sdk` volume, point the reporter's output into it, and replace the gate's command:
+
+```yaml
+  setup:  # the container that reports setup_complete
+    environment:
+      ANTITHESIS_SDK_LOCAL_OUTPUT: /sdk/setup.jsonl  # with an SDK; without one, ANTITHESIS_OUTPUT_DIR: /sdk
+    volumes: [sdk:/sdk]
+  snapshot-gate:
+    command: ["sh", "-c", "until grep -qs antithesis_setup /sdk/*.jsonl; do sleep 1; done"]
+    volumes: [sdk:/sdk]
+volumes:
+  sdk:
+```
+
+`up` returns once the driver has started. Start the coverage build from scratch, let the driver run for a few minutes, then stop the system:
 
 ```bash
 C="docker compose -f docker-compose.yaml -f docker-compose.coverage.yaml"
-$C down -v && $C up -d --build --wait
-$C exec -e ANTITHESIS_SDK_LOCAL_OUTPUT=/tmp/sdk.jsonl driver timeout 300 driver
+$C down -v && $C up -d --build
+sleep 300
 $C cp driver:/tmp/sdk.jsonl .
 $C stop
 ```

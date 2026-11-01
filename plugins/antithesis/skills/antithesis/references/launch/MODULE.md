@@ -12,3 +12,17 @@ First read `snouty validate --help` and `snouty launch --help`. They document th
 4. **Pick the launcher.** Use the launcher named in context, such as `advanced_test`. If none is named, use `basic_test` for Docker Compose and `basic_k8s_test` for Kubernetes.
 5. **Pick the launcher's parameters.** Use the parameters from context.
 6. **Launch it** with `snouty launch`, and report the run ID from its output to the user. To follow the run, use the triage module.
+
+## Launch parameters
+
+### Setup timeout
+
+Before Antithesis can begin fuzzing, it needs to first setup the system and get the SUT to setup complete. The faster the system gets to setup complete the better. With this in mind, `snouty launch` takes a `--setup-timeout` parameter which defaults to 5 minutes. Only adjust this parameter higher if your system genuinely can not reach setup complete in time.
+
+### Compute hours & performance tier
+
+Antithesis runs the fuzzer on large machines with many cores. The default performance tier is `standard` which comes with 48 cores. Higher tiers offer more cores, and thus more concurrent exploration. You can set a higher tier via `--performance-tier`.
+
+Antithesis tracks how many compute hours are used in a run to fuzz the system. One compute hour is one core running for one hour. You can set the maximum number of compute hours to use in a run via the `--max-compute-hours` flag.
+
+After setup, Antithesis fuzzes for `max-compute-hours` ÷ cores hours of wall-clock time. For example, `--max-compute-hours 24` on the standard tier (48 cores) is 0.5h of fuzzing, and the whole run takes 0.5h plus setup time. A faster tier spends the same budget on more cores, so it fuzzes for less wall-clock time.

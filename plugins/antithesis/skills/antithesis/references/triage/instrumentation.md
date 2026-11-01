@@ -6,33 +6,36 @@ Use this guide to verify that the system under test (SUT) and the workload are i
 
 ```bash
 snouty runs properties --detail --name "software was instrumented" "${RUN_ID}"
-snouty runs properties --detail --name "symbols were uploaded" "${RUN_ID}"
+snouty runs properties --detail --name "every instrumented module has symbols" "${RUN_ID}"
 snouty runs properties --detail --name "thread pausing was enabled" "${RUN_ID}"
 ```
 
 All three are meta properties. Their examples carry values, not moments, so there is no log to download.
 
-Each `Software was instrumented` example is one instrumented module that registered with Antithesis:
+Each `Software was instrumented` example is one instrumented module that loaded during the run:
 
 ```json
-{"module_desc": "/usr/local/bin/simulator", "total_locations": 18997, "module": "simulator"}
+{"module": "/usr/local/bin/geo", "language": "Go", "instrumentor": "/go/bin/antithesis-go-toolexec", "total_locations": 17, "has_catalog": true}
 ```
 
-- `module_desc` — identifies the module, usually as an executable path.
+- `module` — identifies the module, usually as an executable path. One binary can appear in several examples, one per instrumented module in it.
 - `total_locations` — the number of instrumentation points (basic blocks or control flow graph edges) in the module.
+- `has_catalog` — whether the module has a symbol catalog.
 
-Each `Symbols were uploaded` example lists the uploaded symbol files, for example `["go-63b47d97195d.sym.tsv"]`.
+`Every instrumented module has symbols` fails when a module loaded without a symbol catalog, or a binary provided for symbols wasn't cataloged in full, for example after link-time optimization. Failing examples name the module or binary.
 
 **Deduplication caveat:** Antithesis deduplicates these two example lists by debug id. The same binary that starts in many containers appears once. Distinct binaries that share a debug id — for example several Go binaries built from one instrumented module — also collapse into one entry. An expected binary can be absent from the list even when it is instrumented.
 
 Each `Thread pausing was enabled` example is a `"binary (container)"` string. This list is per container, and it is not deduplicated by debug id. A binary in this list is instrumented. A binary absent from this list can still be instrumented.
 
+For Java, Python and .NET, also check the properties whose names contain `paths found` and `invalid paths`. See `snouty docs show /docs/reference/default_properties/`.
+
 ## Step 2: compare against the expected binaries
 
 The setup normally instruments the SUT binaries and the workload binary. Build the expected list from the source code when you have access to it — the harness and build files show which binaries the setup instruments. Without source access, infer the list from the user's request, the run description, and the containers in the run.
 
-- **Any of the three properties fails** — a significant finding: something is probably wrong with the instrumentation setup. Report a setup problem and link the [instrumentation documentation](https://antithesis.com/docs/instrumentation/).
-- **Every expected binary appears in a property** — instrumentation works. Report the modules, their `total_locations`, and the symbol files.
+- **Any of these properties fails** — a significant finding: something is probably wrong with the instrumentation setup. Report a setup problem and link the [instrumentation documentation](https://antithesis.com/docs/instrumentation/).
+- **Every expected binary appears in a property** — instrumentation works. Report the modules and their `total_locations`.
 - **Some expected binaries are missing** — do not conclude that they are uninstrumented; deduplication can hide them. Report which binaries the properties confirm, and state that the deduplicated lists cannot confirm the rest.
 
 When you cannot build an expected list, report what the properties show and note the deduplication caveat.

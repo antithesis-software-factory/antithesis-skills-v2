@@ -1,6 +1,8 @@
 # antithesis-plugin
 
-Antithesis plugin.
+This plugin gives a coding agent an entry point to any task involving [Antithesis](https://www.antithesis.com/docs/).
+
+Generally, you'll want to include a prompt of the form "Use Antithesis to test this PR, then triage and debug any failures you find."
 
 ## Install
 
@@ -13,37 +15,38 @@ Antithesis plugin.
 - Devin: [docs/devin.md](docs/devin.md)
 - Replit: [docs/replit.md](docs/replit.md)
 
-
 ## Prerequisites
 
-- You need an Antithesis container registry, credentials, and API key.
+The Antithesis Plugin requires the following tools to be installed.
 
-## What this plugin does
+- [Snouty CLI](https://github.com/antithesishq/snouty)
+- [Docker](https://github.com/docker) or [Podman](https://github.com/podman-container-tools/podman), with Docker Compose.
+- [jq](https://github.com/jqlang/jq)
 
-This plugin enables a coding agent to use Antithesis. Setup, triage, and debugging happen exactly per Antithesis docs, but it takes a different approach to creating the harness around the SUT.
+In addition, Snouty must be authenticated with your Antithesis tenant: `snouty login`. You can check that Snouty is setup correctly by running `snouty doctor`.
 
-The plugin will instruct your agent to:
+## Usage
 
-1. Package the SUT, deploy it to Antithesis, and initialize it in the Antithesis environment using `references/setup/` (this happens exactly per Antithesis docs).
-2. Map all surfaces in the SUT by examining request handlers.
-3. Analyse the SUT and decide which property catalogs to use.
-4. If necessary, write a stateful client for the SUT that contains, e.g. retries, sessions, leases, etc.
-5. Create a driver to exercise the SUT. Instrument the SUT using the language's native coverage tools. The driver includes checks for property failures.
-6. Run the driver against the SUT, checking for property failures and code that never runs. Iterate locally until full coverage is achieved.
-7. Iterate in Antithesis: launch a series of 5 minute runs to check instrumentation and coverage of code that runs only under faults (e.g. failovers).
-8. Launch a 30 minute run, triage, and debug. (this happens exactly per Antithesis docs).
+The Antithesis plugin provides a skill called `/antithesis` (or `$antithesis` in some harnesses). The skill should be invoked automatically for Antithesis related prompts.
 
-## Key differences from Antithesis docs
+In general, you'll want to prompt the agent with one of the following workflows:
 
-- Uses [Hegel](https://www.hegel.dev) as the generator that drives the system under test, not Antithesis' native action generator.
-- Starts by trying to achieve full coverage of all surfaces in the system under test first, rather than reasoning about system properties.
-- Generates a separate property catalog as its own object in the codebase.
+- Write a new workload for system S
+- Add functionality to existing workload W
+- Define or import a property into workload W
+- Launch workload W
+- Triage test run R
+- Root cause failure F
 
-## Concepts / components not in official Antithesis docs
+The skill is designed to be composable, so feel free to ask your agent to chain multiple things together:
 
-This plugin creates a *driver container* that it deploys to Antithesis alongside your system. The driver container is excluded from faults. It contains:
+> /antithesis write a workload for https://github.com/etcd-io/etcd which imports properties from https://antithesis.com/docs/resources/kv_property_catalog.md. You can consume up to 200 compute hours of testing. Use short smoke tests to verify the workload before switching to soak tests to verify etcd. Triage the results, root cause high confidence failures, and file issues for anything new you discover.
 
-- A random generator driven by [Hegel](https://www.hegel.dev).
-- Log listeners and checkers.
-- Outcome listeners if the system has stateful clients.
-- Relevant Property Catalogs, pre-written sets of invariants applicable to systems of a particular type. Each property is a file within the filesystem.
+### Key differences from Antithesis docs
+
+- Uses [Hegel](https://www.hegel.dev) as the generator that drives the system under test, not Antithesis' native test composer.
+- Focuses on reaching coverage of all surfaces in the system under test first, rather than leading with system properties.
+
+## Managing compute consumption
+
+Antithesis bills by compute hours, so consider giving your agent a compute hour budget to spend, per run or overall. Keep your system's setup fast too: every run spends that time before fuzzing starts, so a faster setup makes every Antithesis run shorter. See [the Antithesis docs on usage](https://antithesis.com/docs/configuration/usage/) for details.
