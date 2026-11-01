@@ -2,7 +2,7 @@
 
 ## The driver container
 
-Build the driver into its own image and add it to `docker-compose.yaml` as a service named `driver`. Tell Antithesis to start it through Test Composer:
+Build the driver into its own image and add it to `docker-compose.yaml` as a service named `driver`. The driver is the container's main process, and the container waits for the snapshot gate (below):
 
 ```yaml
   driver:
@@ -15,6 +15,9 @@ Build the driver into its own image and add it to `docker-compose.yaml` as a ser
     image: driver:latest
     environment:
       KV_URLS: http://kv1:8000,http://kv2:8000
+    depends_on:
+      snapshot-gate:
+        condition: service_completed_successfully
 ```
 
 ```dockerfile
@@ -25,24 +28,53 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 COPY --from=build /src/target/release/driver /usr/local/bin/
-COPY driver/test/ /opt/antithesis/test/v1/
-CMD ["sleep", "infinity"]
+CMD ["/usr/local/bin/driver"]
 ```
 
-## The test template
+## The snapshot gate
 
-The test template is a directory under `/opt/antithesis/test/v1/` in the driver container. It holds `singleton_driver_<name>`, which starts the driver:
+Every timeline starts from the root snapshot, which Antithesis takes some time after the system reports `setup_complete` (below). The driver must start after the snapshot, so that each timeline runs its own. A snapshot-gate container holds it back:
 
+1. The gate waits for `/first_open_gate_done`.
+2. The system reports `setup_complete`, and Antithesis takes the root snapshot.
+3. At the start of each timeline, Antithesis runs the gate's `first_open_gate` test command, which creates `/first_open_gate_done`.
+4. The gate exits, and Compose starts the driver.
+
+The system's containers boot before the snapshot, so every timeline starts with the system already up.
+
+```yaml
+  snapshot-gate:
+    container_name: snapshot-gate
+    hostname: snapshot-gate
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: snapshot-gate/Dockerfile
+    image: snapshot-gate:latest
 ```
-driver/test/main/singleton_driver_run
+
+```dockerfile
+FROM debian:bookworm-slim
+COPY snapshot-gate/wait-for-snapshot /usr/local/bin/
+COPY snapshot-gate/first_open_gate /opt/antithesis/test/v1/main/first_open_gate
+CMD ["wait-for-snapshot"]
 ```
+
+`snapshot-gate/wait-for-snapshot`:
 
 ```bash
 #!/usr/bin/env bash
-exec /usr/local/bin/driver
+while [[ ! -e /first_open_gate_done ]]; do sleep 1; done
 ```
 
-Make it executable.
+`snapshot-gate/first_open_gate`:
+
+```bash
+#!/usr/bin/env bash
+touch /first_open_gate_done
+```
+
+Make both executable.
 
 ## Client containers
 
@@ -69,7 +101,7 @@ The driver may start before the client programs are reachable, and clients resta
 
 ## Setup complete
 
-Every timeline starts from the state at the moment something reports `setup_complete`, and Antithesis starts the driver only after that. Report it from the system's side, once every node serves, from a check that retries rather than after a fixed sleep. With an Antithesis SDK, call its `setup_complete` function. Without one, append this line to `$ANTITHESIS_OUTPUT_DIR/sdk.jsonl`:
+Report `setup_complete` from the system's side, once every node serves, from a check that retries rather than after a fixed sleep. With an Antithesis SDK, call its `setup_complete` function. Without one, append this line to `$ANTITHESIS_OUTPUT_DIR/sdk.jsonl`:
 
 ```json
 {"antithesis_setup": {"status": "complete"}}
@@ -89,4 +121,4 @@ The container and CPU exclusions take exact container names. To exclude several 
 
 Exclude only the driver container. Client containers get faulted like the servers: their failures are what they're there for.
 
-Helper containers that only report setup don't need excluding.
+The snapshot gate doesn't need excluding.
