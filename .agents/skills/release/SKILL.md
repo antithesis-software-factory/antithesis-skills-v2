@@ -40,7 +40,7 @@ Write the notes at the level of modules and what the agent does differently:
 - Leave out rewording that doesn't change what the agent does, and internal changes: CI, scripts, this skill, contributor docs.
 - Write each entry as the net change since the previous release. A module that's new in this release is one entry, not the PRs that built it. When one change reverses another, leave out both.
 - Put breaking changes first, then the rest, largest first. A change is breaking if something that worked with the previous release now fails or needs the user to act: a renamed module or command, a new requirement on the user's setup, a changed harness layout that existing workloads need to adopt. Start each with `**Breaking**:` and say what to do instead.
-- Link every PR that contributes to an entry, e.g. `([#7](https://github.com/antithesishq/antithesis-plugin/pull/7))`.
+- Link every PR that contributes to an entry, under the repository's URL from `gh repo view --json url -q .url`, e.g. `([#7](https://github.com/antithesishq/antithesis-plugin/pull/7))`.
 
 Put the notes at the top of `CHANGELOG.md`, under `# Version X.Y.Z (YYYY-MM-DD)` with today's date. Create the file if it doesn't exist. Then check that `scripts/changelog-section X.Y.Z` prints them: the release workflow uses the same script.
 
